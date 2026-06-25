@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <fnmatch.h>
 #include <unistd.h>
+#include "host_match.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/prctl.h>
@@ -43,10 +44,6 @@
     const char *_p = (dladdr(_ra, &_di) && _di.dli_fname) ? _di.dli_fname : "?"; \
     const char *_s = strrchr(_p, '/'); _s ? _s + 1 : _p;                \
 })
-#ifndef FNM_CASEFOLD
-#define FNM_CASEFOLD 0x10
-#endif
-
 static __thread int in_poseidon = 0;
 
 // ---- policy (set via JNI) ----
@@ -82,7 +79,7 @@ static void cache_put(int family, const void *addr, const char *host) {
 
 static int host_allowed_locked(const char *name) {
     for (int i = 0; i < g_host_count; i++)
-        if (fnmatch(g_hosts[i], name, FNM_CASEFOLD) == 0) return 1;
+        if (poseidon_host_match(g_hosts[i], name)) return 1;
     return 0;
 }
 
