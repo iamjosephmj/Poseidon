@@ -56,14 +56,15 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 3. Android SDK + NDK
-      #    android-actions/setup-android accepts licenses automatically and
-      #    installs the SDK.  AGP will auto-provision the NDK version declared
-      #    in the module build files (28.2.13676358) via the ndkVersion property,
-      #    so we do NOT pin it here — this is simpler and more robust than
-      #    calling sdkmanager manually for a specific NDK revision.
+      #    Pre-install the exact NDK the module build files declare
+      #    (ndkVersion 28.2.13676358) so the build doesn't download it
+      #    mid-`assembleDebug` (faster, and a clear failure if it's missing
+      #    rather than a vague CMake/NDK error on transient network failure).
       # -----------------------------------------------------------------------
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;28.2.13676358'
 
       # -----------------------------------------------------------------------
       # 4. Gradle wrapper permissions
@@ -116,7 +117,7 @@ jobs:
       #    poseidon-native/src/main/cpp/test/glob_vectors.txt
       # -----------------------------------------------------------------------
       - name: Run glob ctypes equivalence check (belt-and-suspenders)
-        run: python3 poseidon-native/src/main/cpp/test/glob_equiv_check.py
+        run: python3 poseidon-native/src/main/cpp/test/glob_equiv_check.py poseidon-native/src/main/cpp/test/glob_vectors.txt
 
       # -----------------------------------------------------------------------
       # 9. Smoke-build the sample app
