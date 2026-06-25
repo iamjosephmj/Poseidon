@@ -14,6 +14,8 @@ dependencies {
     compileOnly("org.ow2.asm:asm-commons:9.7")
     // YAML policy parsing (bundled with the plugin).
     implementation("org.yaml:snakeyaml:2.2")
+    // JUnit for testing.
+    testImplementation("junit:junit:4.13.2")
 }
 
 gradlePlugin {
