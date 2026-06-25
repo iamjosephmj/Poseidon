@@ -15,6 +15,29 @@ object PolicyEngine {
         this.deniedPaths = deniedPaths
     }
 
+    /** The single decision point. Host allow-list first, then path deny-list (JVM tier only). */
+    @JvmStatic
+    fun evaluate(event: EgressEvent): Decision {
+        val host = event.host
+        if (allowedHosts.isNotEmpty()) {
+            val matched = host?.let { h -> allowedHosts.firstOrNull { glob(it, h) } }
+            if (matched == null) {
+                return Decision(Action.BLOCK, matchedRule = "default-deny", reason = "host not in allow-list")
+            }
+        }
+        if (event.tier == Tier.JVM) {
+            val path = event.path
+            if (path != null) {
+                val deny = deniedPaths.firstOrNull { glob(it, path) }
+                if (deny != null) {
+                    return Decision(Action.BLOCK, matchedRule = "deny-path:$deny", reason = "path in deny-list")
+                }
+            }
+        }
+        val allowRule = host?.let { h -> allowedHosts.firstOrNull { glob(it, h) } }?.let { "allow:$it" }
+        return Decision(Action.ALLOW, matchedRule = allowRule, reason = "")
+    }
+
     /** Allow-list: if an allow-list is set, the host must match one of its globs. */
     @JvmStatic
     fun evaluateHost(host: String, port: Int): Decision {
