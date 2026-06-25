@@ -32,10 +32,13 @@ object NativeShimBackend : NativeBridge.Backend {
         }
     }
 
-    // ---- JNI externals (9 symbols) ----
+    // ---- JNI externals (10 symbols) ----
 
     /** Pushes the host allow-list + mode into native. */
     private external fun configure(allowedHosts: Array<String>, enforce: Int)
+
+    /** Pushes the opt-in CIDR allow-list into native (closes the bare-IP raw-connect residual). */
+    private external fun configureCidrs(cidrs: Array<String>)
 
     /** Feasibility probe for in-process seccomp. */
     private external fun seccompProbe()
@@ -89,6 +92,15 @@ object NativeShimBackend : NativeBridge.Backend {
     override fun cacheHostIps(host: String, ips: Array<String>) {
         if (!available) return
         try { cacheHost(host, ips) } catch (_: Throwable) {}
+    }
+
+    override fun setAllowedCidrs(cidrs: List<String>) {
+        if (!available) return
+        try {
+            configureCidrs(cidrs.toTypedArray())
+        } catch (t: Throwable) {
+            Log.w("Poseidon", "native configureCidrs failed: ${t.message}")
+        }
     }
 
     override fun installSeccompGate(dnsCorrelation: Boolean) {

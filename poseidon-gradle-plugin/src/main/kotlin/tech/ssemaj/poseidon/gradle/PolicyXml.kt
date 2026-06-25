@@ -12,6 +12,7 @@ data class CompiledPolicy(
     val deniedPaths: List<String>,
     val dnsCorrelation: Boolean,
     val approvedLibraries: Set<String>,
+    val allowedCidrs: List<String> = emptyList(),
 )
 
 /** Parses the spec §7 <poseidon> XML for the app (authoritative) and libraries (proposals). */
@@ -39,6 +40,7 @@ object PolicyXml {
             deniedPaths = root.childElements("deny-path").map { it.getAttribute("pattern") },
             dnsCorrelation = root.getAttribute("nativeDnsCorrelation") == "true",
             approvedLibraries = root.childElements("approve").map { it.getAttribute("library") }.toSet(),
+            allowedCidrs = root.childElements("allow-cidr").map { it.getAttribute("value") },
         )
     }
 

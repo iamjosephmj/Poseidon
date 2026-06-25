@@ -26,6 +26,7 @@ class PoseidonPlugin : Plugin<Project> {
             val md = ext.mode
             val pf = ext.policyFile
             val dns = ext.nativeDnsCorrelation
+            val cidrs = ext.allowedCidrs.toList()
             val mergedManifestProvider = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST)
             val genTask = project.tasks.register("generatePoseidonPolicy$cap", GeneratePolicyTask::class.java)
             genTask.configure {
@@ -33,6 +34,7 @@ class PoseidonPlugin : Plugin<Project> {
                 deniedPaths.set(paths)
                 mode.set(md)
                 dnsCorrelation.set(dns)
+                allowedCidrs.set(cidrs)
                 if (pf != null) policyFile.set(project.layout.projectDirectory.file(pf))
                 proposalsAction.set(ext.proposalsAction)
                 acceptProposals.set(ext.acceptProposals)

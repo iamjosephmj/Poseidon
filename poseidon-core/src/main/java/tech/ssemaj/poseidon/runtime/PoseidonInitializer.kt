@@ -24,6 +24,9 @@ class PoseidonInitializer : Initializer<Unit> {
             PolicyEngine.configure(hosts, o.strings("deniedPaths"))
             // Push the host allow-list into the native shim (covers native SDK traffic).
             NativeBridge.apply(hosts, Mode.current == Mode.ENFORCE)
+            // Push opt-in CIDR allow-list (closes the bare-IP raw-connect residual).
+            val cidrs = o.strings("allowedCidrs")
+            NativeBridge.setAllowedCidrs(cidrs)
             // Install the seccomp connect() gate — covers Go/raw-syscall (below libc).
             // ENFORCE implies DNS correlation (guarantee posture: default-deny by name
             // across raw/Go DNS too); MONITOR honors the explicit opt-in flag.
@@ -33,7 +36,8 @@ class PoseidonInitializer : Initializer<Unit> {
                 "Poseidon",
                 "policy loaded: mode=${Mode.current}, " +
                     "${o.strings("allowedHosts").size} allowed host(s), " +
-                    "${o.strings("deniedPaths").size} denied path(s)",
+                    "${o.strings("deniedPaths").size} denied path(s), " +
+                    "${cidrs.size} allowed CIDR(s)",
             )
         } catch (e: Exception) {
             Log.w("Poseidon", "no policy asset found; running open (${e.message})")

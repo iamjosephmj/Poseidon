@@ -48,6 +48,9 @@ abstract class GeneratePolicyTask : DefaultTask() {
     abstract val mergedManifest: RegularFileProperty
 
     @get:Input
+    abstract val allowedCidrs: ListProperty<String>
+
+    @get:Input
     abstract val proposalsAction: Property<String>
 
     @get:Input
@@ -68,6 +71,11 @@ abstract class GeneratePolicyTask : DefaultTask() {
 
         // Fix 1: OR-in the DSL nativeDnsCorrelation so the escape-hatch augments the XML value.
         var effectiveApp = app.copy(dnsCorrelation = app.dnsCorrelation || dnsCorrelation.get())
+
+        // Union DSL CIDRs into effectiveApp.
+        effectiveApp = effectiveApp.copy(
+            allowedCidrs = (effectiveApp.allowedCidrs + allowedCidrs.get()).distinct()
+        )
 
         // Fix 2: Parse optional YAML policyFile and union its fields into the compile inputs.
         if (policyFile.isPresent && policyFile.get().asFile.exists()) {
@@ -92,6 +100,13 @@ abstract class GeneratePolicyTask : DefaultTask() {
                 // YAML nativeDnsCorrelation → OR into effectiveApp.dnsCorrelation
                 if (yaml["nativeDnsCorrelation"] == true) {
                     effectiveApp = effectiveApp.copy(dnsCorrelation = true)
+                }
+                // YAML allowedCidrs → union into effectiveApp.allowedCidrs
+                val yamlCidrs = (yaml["allowedCidrs"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                if (yamlCidrs.isNotEmpty()) {
+                    effectiveApp = effectiveApp.copy(
+                        allowedCidrs = (effectiveApp.allowedCidrs + yamlCidrs).distinct()
+                    )
                 }
             }
         }

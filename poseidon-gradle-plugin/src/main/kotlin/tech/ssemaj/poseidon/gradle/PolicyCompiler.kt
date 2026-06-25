@@ -22,12 +22,14 @@ object PolicyCompiler {
             append("{\"mode\":\"").append(app.mode).append("\",")
             append("\"dnsCorrelation\":").append(app.dnsCorrelation).append(",")
             append("\"allowedHosts\":[").append(hosts.joinToString(",") { jstr(it) }).append("],")
-            append("\"deniedPaths\":[").append(app.deniedPaths.joinToString(",") { jstr(it) }).append("]}")
+            append("\"deniedPaths\":[").append(app.deniedPaths.joinToString(",") { jstr(it) }).append("],")
+            append("\"allowedCidrs\":[").append(app.allowedCidrs.joinToString(",") { jstr(it) }).append("]}")
         }
         val report = buildString {
             appendLine("Poseidon effective policy (mode=${app.mode})")
             appendLine("Allowed hosts:"); hosts.forEach { appendLine("  - $it") }
             appendLine("Denied paths:"); app.deniedPaths.forEach { appendLine("  - $it") }
+            appendLine("Allowed CIDRs:"); app.allowedCidrs.forEach { appendLine("  - $it") }
             appendLine("Library proposals:")
             proposals.forEach {
                 val status = if (it in granted) "GRANTED" else "NOT GRANTED (needs <approve> or acceptProposals)"

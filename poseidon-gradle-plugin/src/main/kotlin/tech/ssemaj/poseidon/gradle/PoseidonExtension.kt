@@ -28,6 +28,16 @@ open class PoseidonExtension {
     /** App-authoritative manifest policy XML (relative to the module). Canonical source. */
     var policyXml: String? = "src/main/res/xml/poseidon_policy.xml"
 
+    /**
+     * Opt-in IP/CIDR allow-list. When non-empty, closes the un-correlated bare-IP residual
+     * in the seccomp gate: any raw/Go connect() to an IP not covered by a declared CIDR
+     * (and not already allowed-by-host via the DNS-correlation cache) is blocked.
+     *
+     * Must include the CDN/cloud IP ranges of your allow-listed hosts (e.g. Cloudflare
+     * ranges for example.com). Default empty = unchanged behavior (positive-identity only).
+     */
+    val allowedCidrs: MutableList<String> = mutableListOf()
+
     /** Grant every library proposal without explicit <approve> (default: only approved are granted). */
     var acceptProposals: Boolean = false
 

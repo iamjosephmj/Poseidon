@@ -88,6 +88,11 @@ static char **g_hosts = NULL;   // allow-list globs (hostnames and/or IP literal
 static int g_host_count = 0;
 static int g_enforce = 0;       // 0 = monitor, 1 = enforce
 
+// ---- opt-in CIDR allow-list (closes the bare-IP raw-connect residual) ----
+static struct { int family; unsigned char net[16]; int prefix; } g_cidrs[64];
+static int g_cidr_count = 0;
+static int g_have_cidrs = 0;
+
 // ---- IP -> hostname cache (ring buffer) ----
 #define CACHE_CAP 4096
 typedef struct {
@@ -133,6 +138,32 @@ static int host_denied(const char *name) {
 
 // Verdicts.
 enum { P_NA = 0, P_ALLOW = 1, P_BLOCK = 2, P_MONITOR_VIOL = 3 };
+
+// Check if `ip` (raw bytes, family AF_INET or AF_INET6) falls within any declared CIDR.
+// Caller MUST hold g_lock. Returns 1 on match, 0 otherwise.
+// A CIDR match does NOT affect the `identified` flag — CIDRs are address-range grants,
+// not positive identity via the DNS-correlation cache.
+static int ip_in_allowed_cidr(int family, const void *ip) {
+    int iplen = (family == AF_INET) ? 4 : 16;
+    for (int i = 0; i < g_cidr_count; i++) {
+        if (g_cidrs[i].family != family) continue;
+        int prefix = g_cidrs[i].prefix;
+        /* Compare full bytes */
+        int full_bytes = prefix / 8;
+        int rem_bits   = prefix % 8;
+        const unsigned char *a = (const unsigned char *) ip;
+        const unsigned char *b = g_cidrs[i].net;
+        if (full_bytes > iplen) full_bytes = iplen;
+        if (memcmp(a, b, (size_t) full_bytes) != 0) continue;
+        /* Compare partial byte (remaining bits), if any */
+        if (rem_bits > 0 && full_bytes < iplen) {
+            unsigned char mask = (unsigned char)(0xFF << (8 - rem_bits));
+            if ((a[full_bytes] & mask) != (b[full_bytes] & mask)) continue;
+        }
+        return 1;
+    }
+    return 0;
+}
 
 // identified (optional out): set to 1 if the IP was positively mapped to a cached
 // hostname (so callers can choose to block only positively-identified denials).
@@ -186,6 +217,7 @@ static int poseidon_check(const struct sockaddr *sa, char *desc, size_t dlen, in
         }
     }
     if (!allowed && host_allowed_locked(ipstr)) allowed = 1; // IP literal in allow-list
+    if (!allowed) allowed = ip_in_allowed_cidr(family, ip); // CIDR allow-list (does not set identified)
     // build desc (best-effort hostname)
     const char *hostname = ipstr;
     for (int i = 0; i < g_cache_size; i++) {
@@ -515,7 +547,10 @@ static void *seccomp_supervisor(void *arg) {
                 // Java layer; this tier covers native/Go traffic by positive identity.
                 int identified = 0;
                 int v = poseidon_check((const struct sockaddr *) &ss, desc, sizeof desc, &identified);
-                int do_block = (v == P_BLOCK && identified);
+                // Block when: explicitly denied AND (positively identified via DNS cache,
+                // OR a non-empty CIDR list is configured — making unidentified IPs default-deny
+                // outside declared ranges). No CIDRs → positive-identity only (original behavior).
+                int do_block = (v == P_BLOCK) && (identified || g_have_cidrs);
                 if (do_block || v == P_MONITOR_VIOL) {
                     /* emit to ring (HOT PATH — no LOG) */
                     char shost[64];
@@ -530,8 +565,9 @@ static void *seccomp_supervisor(void *arg) {
                     resp.error = -EACCES;
                 } else if (v == P_MONITOR_VIOL || v == P_BLOCK) {
                     // CONTINUE: monitor-mode would-block, OR an unidentified (cache-miss)
-                    // deny — let the kernel re-execute the real connect. resp.flags keeps
-                    // the default SECCOMP_USER_NOTIF_FLAG_CONTINUE set before the dispatch.
+                    // P_BLOCK when no CIDR list is configured (positive-identity only mode).
+                    // When a CIDR list IS configured, unidentified P_BLOCK is do_block above.
+                    // resp.flags keeps the default SECCOMP_USER_NOTIF_FLAG_CONTINUE set.
                 } else {
                     // P_ALLOW / P_NA: emulate the connect with the trusted copy (no CONTINUE,
                     // so the destination can't be swapped after the check).
@@ -803,6 +839,68 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_cacheHost(
         (*env)->DeleteLocalRef(env, s);
     }
     (*env)->ReleaseStringUTFChars(env, jhost, host);
+}
+
+// ---- JNI: opt-in CIDR allow-list pushed from PoseidonInitializer after configure() ----
+// Each string is "addr/prefix" (IPv4 or IPv6). Caps at 64 entries.
+// Sets g_have_cidrs=1 when non-empty, which flips the supervisor connect handler
+// from positive-identity-only to default-deny (closes the bare-IP raw-connect residual).
+JNIEXPORT void JNICALL
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configureCidrs(
+    JNIEnv *env, jobject thiz, jobjectArray arr) {
+    (void) thiz;
+    int n = (*env)->GetArrayLength(env, arr);
+    if (n > 64) n = 64;
+    pthread_mutex_lock(&g_lock);
+    g_cidr_count = 0;
+    g_have_cidrs = 0;
+    for (int i = 0; i < n; i++) {
+        jstring js = (jstring) (*env)->GetObjectArrayElement(env, arr, i);
+        const char *s = (*env)->GetStringUTFChars(env, js, NULL);
+        /* Split on '/' */
+        const char *slash = strchr(s, '/');
+        if (!slash) {
+            (*env)->ReleaseStringUTFChars(env, js, s);
+            (*env)->DeleteLocalRef(env, js);
+            continue;
+        }
+        char addr_buf[64];
+        int alen = (int)(slash - s);
+        if (alen <= 0 || alen >= (int)sizeof(addr_buf)) {
+            (*env)->ReleaseStringUTFChars(env, js, s);
+            (*env)->DeleteLocalRef(env, js);
+            continue;
+        }
+        memcpy(addr_buf, s, (size_t) alen);
+        addr_buf[alen] = '\0';
+        int prefix = atoi(slash + 1);
+        struct in_addr a4;
+        struct in6_addr a6;
+        int family = 0;
+        unsigned char raw[16];
+        memset(raw, 0, sizeof raw);
+        if (inet_pton(AF_INET, addr_buf, &a4) == 1) {
+            family = AF_INET;
+            memcpy(raw, &a4, 4);
+            if (prefix < 0) prefix = 0;
+            if (prefix > 32) prefix = 32;
+        } else if (inet_pton(AF_INET6, addr_buf, &a6) == 1) {
+            family = AF_INET6;
+            memcpy(raw, &a6, 16);
+            if (prefix < 0) prefix = 0;
+            if (prefix > 128) prefix = 128;
+        }
+        (*env)->ReleaseStringUTFChars(env, js, s);
+        (*env)->DeleteLocalRef(env, js);
+        if (!family) continue;
+        g_cidrs[g_cidr_count].family = family;
+        memcpy(g_cidrs[g_cidr_count].net, raw, sizeof raw);
+        g_cidrs[g_cidr_count].prefix = prefix;
+        g_cidr_count++;
+    }
+    g_have_cidrs = (g_cidr_count > 0);
+    pthread_mutex_unlock(&g_lock);
+    LOG("native CIDR allow-list: %d range(s), have_cidrs=%d", g_cidr_count, g_have_cidrs);
 }
 
 // ---- JNI: PolicyEngine pushes the compiled policy here at startup ----

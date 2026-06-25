@@ -5,11 +5,13 @@ object NativeBridge {
     interface Backend {
         fun apply(allowedHosts: List<String>, enforce: Boolean)
         fun cacheHostIps(host: String, ips: Array<String>)
+        fun setAllowedCidrs(cidrs: List<String>)
         fun installSeccompGate(dnsCorrelation: Boolean)
     }
     @Volatile private var backend: Backend? = null
     @JvmStatic fun register(b: Backend) { backend = b }
     fun apply(allowedHosts: List<String>, enforce: Boolean) { backend?.apply(allowedHosts, enforce) }
     fun cacheHostIps(host: String, ips: Array<String>) { backend?.cacheHostIps(host, ips) }
+    fun setAllowedCidrs(cidrs: List<String>) { backend?.setAllowedCidrs(cidrs) }
     fun installSeccompGate(dnsCorrelation: Boolean) { backend?.installSeccompGate(dnsCorrelation) }
 }

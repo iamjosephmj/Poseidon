@@ -16,6 +16,7 @@ LIBC {
     Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_cacheHost;
     Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_drainEvents;
     Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_symbolize;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configureCidrs;
   local:
     *;
 };
