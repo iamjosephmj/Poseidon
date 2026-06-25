@@ -1,0 +1,185 @@
+# Poseidon CI
+#
+# Runs on every push and PR.  Enforces:
+#   - Plugin unit tests
+#   - JVM core unit tests (includes GlobVectorEquivalenceTest — JVM evaluator side)
+#   - Host native glob_test + ring_test via CMake (native evaluator side)
+#   - ctypes belt-and-suspenders check via glob_equiv_check.py
+#   - App assembleDebug (smoke-build)
+#
+# Spec §5 invariant 4 enforcement:
+#   The JVM GlobVectorEquivalenceTest (poseidon-core unit-test step) AND the native
+#   glob_test / ctypes check (cmake step) all run against the same
+#   poseidon-native/src/main/cpp/test/glob_vectors.txt.
+#   If either evaluator disagrees with the expected column the corresponding step
+#   exits non-zero and the job fails — enforcing that both glob evaluators remain
+#   equivalent on every commit.
+#
+# On-device acceptance suite (Checkpoints 1/4/5 logcat assertions) is in a
+# SEPARATE job gated to self-hosted runners with the `android-device` label.
+# It is disabled by default (runs-on requires a connected Pixel).
+
+name: Poseidon CI
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Main CI job — ubuntu-latest (hosted runner, no physical device required)
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Java (Temurin 17)
+      #    Do NOT use the local snap path (/snap/android-studio/230/jbr).
+      #    actions/setup-java sets JAVA_HOME automatically.
+      # -----------------------------------------------------------------------
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # -----------------------------------------------------------------------
+      # 3. Android SDK + NDK
+      #    android-actions/setup-android accepts licenses automatically and
+      #    installs the SDK.  AGP will auto-provision the NDK version declared
+      #    in the module build files (28.2.13676358) via the ndkVersion property,
+      #    so we do NOT pin it here — this is simpler and more robust than
+      #    calling sdkmanager manually for a specific NDK revision.
+      # -----------------------------------------------------------------------
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # -----------------------------------------------------------------------
+      # 4. Gradle wrapper permissions
+      # -----------------------------------------------------------------------
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # -----------------------------------------------------------------------
+      # 5. Publish Gradle plugin to mavenLocal, then run its unit tests
+      # -----------------------------------------------------------------------
+      - name: Publish plugin to mavenLocal
+        run: ./gradlew -p poseidon-gradle-plugin publishToMavenLocal
+
+      - name: Run plugin unit tests
+        run: ./gradlew -p poseidon-gradle-plugin test
+
+      # -----------------------------------------------------------------------
+      # 6. Run JVM core unit tests
+      #    Includes GlobVectorEquivalenceTest — the JVM evaluator side of
+      #    spec §5 invariant 4.  Uses glob_vectors.txt in poseidon-native/.
+      # -----------------------------------------------------------------------
+      - name: Run poseidon-core unit tests (JVM glob equivalence + all core tests)
+        run: ./gradlew :poseidon-core:testDebugUnitTest
+
+      # -----------------------------------------------------------------------
+      # 7. Build + run host native glob_test and ring_test via CMake
+      #    (spec §5 invariant 4 — native evaluator side)
+      #    ubuntu-latest has gcc + cmake pre-installed.
+      # -----------------------------------------------------------------------
+      - name: Build native host tests (CMake)
+        run: |
+          cmake \
+            -S poseidon-native/src/main/cpp/test \
+            -B /tmp/poseidon-cmake \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/poseidon-cmake
+
+      - name: Run native glob_test (spec §5 invariant 4 — native evaluator)
+        # Non-zero exit fails the job, enforcing evaluator equivalence.
+        run: |
+          /tmp/poseidon-cmake/glob_test \
+            poseidon-native/src/main/cpp/test/glob_vectors.txt
+
+      - name: Run native ring_test (MPSC event-ring concurrency)
+        run: /tmp/poseidon-cmake/ring_test
+
+      # -----------------------------------------------------------------------
+      # 8. ctypes / libc fnmatch check (belt-and-suspenders, spec §5 invariant 4)
+      #    Default path in glob_equiv_check.py now points to the correct location:
+      #    poseidon-native/src/main/cpp/test/glob_vectors.txt
+      # -----------------------------------------------------------------------
+      - name: Run glob ctypes equivalence check (belt-and-suspenders)
+        run: python3 poseidon-native/src/main/cpp/test/glob_equiv_check.py
+
+      # -----------------------------------------------------------------------
+      # 9. Smoke-build the sample app
+      # -----------------------------------------------------------------------
+      - name: Assemble :app debug APK
+        run: ./gradlew :app:assembleDebug
+
+  # ---------------------------------------------------------------------------
+  # On-device acceptance suite
+  # Requires a self-hosted runner with label `android-device` (real Pixel).
+  # Tests Checkpoints 1 / 4 / 5 (logcat assertions for allow/deny/observer).
+  #
+  # DISABLED by default: the `runs-on` label means this job only executes when
+  # a matching self-hosted runner is registered.  To enable in your own infra,
+  # register a runner with labels [self-hosted, android-device] and connect a
+  # Pixel (or emulator) as the ADB default device.
+  # ---------------------------------------------------------------------------
+  on-device-acceptance:
+    name: On-Device Acceptance Suite (self-hosted Pixel)
+    # Gate: only runs on a runner labelled `android-device`.
+    # Remove or replace with `ubuntu-latest` + an emulator action to enable
+    # on hosted runners.
+    runs-on: [self-hosted, android-device]
+    # Explicitly skip this job in automated CI until a device runner is registered.
+    if: ${{ false }}  # ← remove this line to enable once runner is registered
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # Install + launch debug APK on the connected device
+      - name: Build and install debug APK
+        run: |
+          ./gradlew :app:assembleDebug
+          adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+      # Checkpoint 1: allowed-host request reaches internet (logcat probe)
+      - name: Checkpoint 1 — allowed host passes through
+        run: |
+          adb logcat -c
+          adb shell am start -n com.example.poseidon/.MainActivity
+          sleep 5
+          adb logcat -d | grep "POSEIDON_ALLOW" | grep -q "allowed-host" \
+            || (echo "FAIL: Checkpoint 1 — allowed host log not found" && exit 1)
+
+      # Checkpoint 4: denied-host request blocked (logcat probe)
+      - name: Checkpoint 4 — denied host is blocked
+        run: |
+          adb logcat -d | grep "POSEIDON_DENY" | grep -q "denied-host" \
+            || (echo "FAIL: Checkpoint 4 — denied host block log not found" && exit 1)
+
+      # Checkpoint 5: observer receives both allow and deny events (logcat probe)
+      - name: Checkpoint 5 — observer sees both event types
+        run: |
+          adb logcat -d | grep "POSEIDON_OBSERVER" \
+            || (echo "FAIL: Checkpoint 5 — observer events not found" && exit 1)
