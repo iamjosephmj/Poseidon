@@ -60,8 +60,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // Poseidon: runtime carries the interceptor/shim the plugin wires in.
-    implementation(project(":poseidon-runtime"))
+    // Poseidon: all-umbrella brings core + native shim + seccomp tier.
+    implementation(project(":poseidon-all"))
     implementation("org.chromium.net:cronet-embedded:143.7445.0")
     implementation("com.android.volley:volley:1.2.1")
     // OkHttp present so the plugin's bytecode transform has something to instrument.

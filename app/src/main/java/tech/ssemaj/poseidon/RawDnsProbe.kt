@@ -1,7 +1,7 @@
 package tech.ssemaj.poseidon
 
 import android.util.Log
-import tech.ssemaj.poseidon.runtime.NativeBridge
+import tech.ssemaj.poseidon.runtime.NativeShimBackend
 import java.util.concurrent.Executors
 
 // Resolves a host via RAW DNS (sendto/recvfrom — like Go's pure resolver), then
@@ -11,10 +11,10 @@ object RawDnsProbe {
     fun run() {
         Executors.newSingleThreadExecutor().execute {
             Thread.sleep(1200)
-            val ip = NativeBridge.rawResolveTest("www.google.com") // denied host
+            val ip = NativeShimBackend.rawResolveTest("www.google.com") // denied host
             Log.i("PoseidonDemo", "raw-dns www.google.com -> $ip")
             if (ip != null) {
-                val e = NativeBridge.rawConnectTest(ip, 443)
+                val e = NativeShimBackend.rawConnectTest(ip, 443)
                 Log.i("PoseidonDemo", "raw-connect $ip (resolved from www.google.com) -> errno=$e")
             }
         }
