@@ -298,7 +298,7 @@ struct hostent *gethostbyname(const char *name) {
 #define SECCOMP_FILTER_FLAG_NEW_LISTENER (1UL << 3)
 #endif
 JNIEXPORT void JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_seccompProbe(JNIEnv *env, jobject thiz) {
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_seccompProbe(JNIEnv *env, jobject thiz) {
     LOG("seccomp probe: start (app domain)");
     int nnp = prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
     LOG("seccomp: PR_SET_NO_NEW_PRIVS=%d errno=%d", nnp, errno);
@@ -556,7 +556,7 @@ static void *seccomp_supervisor(void *arg) {
 }
 
 JNIEXPORT jint JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_installSeccomp(JNIEnv *env, jobject thiz, jint dnsCorrelation) {
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_installSeccomp(JNIEnv *env, jobject thiz, jint dnsCorrelation) {
 // Enabled on every ABI with a direct connect syscall (arm64, arm32, x86_64, x86).
 #if defined(__NR_connect)
     LOG("seccomp gate: starting supervisor"); // also warms up liblog before the filter
@@ -617,7 +617,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeBridge_installSeccomp(JNIEnv *env, jobje
 // Test helper: issue connect() as a RAW syscall (bypasses the libc connect symbol,
 // like Go) so we can verify the seccomp gate catches it. Returns errno (0 on success).
 JNIEXPORT jint JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawConnect(
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawConnect(
     JNIEnv *env, jobject thiz, jstring jip, jint port) {
     const char *ip = (*env)->GetStringUTFChars(env, jip, NULL);
     int s = socket(AF_INET, SOCK_STREAM, 0);
@@ -637,7 +637,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawConnect(
 // Test helper: RAW-syscall connectionless UDP sendto (no connect), like Go's
 // WriteToUDP. Returns errno (13/EACCES if the seccomp gate blocked it).
 JNIEXPORT jint JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawSendto(JNIEnv *env, jobject thiz, jstring jip, jint jport) {
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawSendto(JNIEnv *env, jobject thiz, jstring jip, jint jport) {
     const char *ip = (*env)->GetStringUTFChars(env, jip, NULL);
     int s = socket(AF_INET, SOCK_DGRAM, 0);
     struct sockaddr_in a;
@@ -658,7 +658,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawSendto(JNIEnv *env, jobject th
 // pure resolver). The seccomp supervisor records the query + parses the answer into
 // the IP->host cache. Returns the first A-record IP (or null).
 JNIEXPORT jstring JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawResolve(JNIEnv *env, jobject thiz, jstring jhost) {
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawResolve(JNIEnv *env, jobject thiz, jstring jhost) {
     const char *host = (*env)->GetStringUTFChars(env, jhost, NULL);
     unsigned char q[300];
     int ql = 0;
@@ -712,7 +712,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeBridge_rawResolve(JNIEnv *env, jobject t
 // seccomp connect gate recognizes the host's IPs (platform/JVM resolution bypasses
 // our libc getaddrinfo hook — this closes the strict-mode over-block for JVM clients).
 JNIEXPORT void JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_cacheHost(
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_cacheHost(
     JNIEnv *env, jobject thiz, jstring jhost, jobjectArray jips) {
     const char *host = (*env)->GetStringUTFChars(env, jhost, NULL);
     int n = (*env)->GetArrayLength(env, jips);
@@ -736,7 +736,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeBridge_cacheHost(
 
 // ---- JNI: PolicyEngine pushes the compiled policy here at startup ----
 JNIEXPORT void JNICALL
-Java_tech_ssemaj_poseidon_runtime_NativeBridge_configure(
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configure(
     JNIEnv *env, jobject thiz, jobjectArray hosts, jint enforce) {
     int n = (*env)->GetArrayLength(env, hosts);
     char **arr = (char **) calloc(n > 0 ? n : 1, sizeof(char *));

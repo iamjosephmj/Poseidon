@@ -1,0 +1,19 @@
+LIBC {
+  global:
+    connect;
+    sendto;
+    sendmsg;
+    sendmmsg;
+    getaddrinfo;
+    android_getaddrinfofornet;
+    gethostbyname;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configure;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_seccompProbe;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_installSeccomp;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawConnect;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawResolve;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawSendto;
+    Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_cacheHost;
+  local:
+    *;
+};

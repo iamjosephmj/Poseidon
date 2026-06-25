@@ -12,6 +12,9 @@ import org.json.JSONObject
  */
 class PoseidonInitializer : Initializer<Unit> {
     override fun create(context: Context) {
+        // Discover the optional native backend (poseidon-native). Triggers NativeShimBackend's
+        // object init -> loadLibrary + NativeBridge.register(this). Absent in JVM-only builds.
+        try { Class.forName("tech.ssemaj.poseidon.runtime.NativeShimBackend") } catch (_: Throwable) {}
         try {
             val json = context.assets.open("poseidon/policy.json")
                 .bufferedReader().use { it.readText() }
