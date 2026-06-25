@@ -504,25 +504,36 @@ static void *seccomp_supervisor(void *arg) {
                 if (alen > (socklen_t) sizeof ss) alen = (socklen_t) sizeof ss;
                 memcpy(&ss, uaddr, alen);
                 char desc[320];
-                int v = poseidon_check((const struct sockaddr *) &ss, desc, sizeof desc, NULL);
-                if (v == P_BLOCK || v == P_MONITOR_VIOL) {
+                // Positive-identity enforcement: block only when the destination IP is
+                // positively mapped (via the DNS-correlation cache) to a DENIED host. A
+                // cache-miss / unidentified IP CONTINUEs instead of being default-denied —
+                // this avoids the strict-by-IP CDN over-block for platform-resolver (JVM)
+                // clients on rotating CDNs (e.g. example.com on Cloudflare), at the cost of
+                // letting an un-correlated raw/Go connect to a bare IP through (the
+                // sendto/recvfrom DNS-correlation layer is what turns those into identified
+                // denials). JVM clients are still gated by the bytecode adapters at the
+                // Java layer; this tier covers native/Go traffic by positive identity.
+                int identified = 0;
+                int v = poseidon_check((const struct sockaddr *) &ss, desc, sizeof desc, &identified);
+                int do_block = (v == P_BLOCK && identified);
+                if (do_block || v == P_MONITOR_VIOL) {
                     /* emit to ring (HOT PATH — no LOG) */
                     char shost[64];
                     desc_host(desc, shost, sizeof shost);
                     ring_push(mono_ns(), shost,
                               get_port((const struct sockaddr *)&ss),
                               0 /*TCP*/, 1 /*seccomp*/,
-                              (v == P_BLOCK) ? 1 : 0, 0);
+                              do_block ? 1 : 0, 0);
                 }
-                if (v == P_BLOCK) {
+                if (do_block) {
                     resp.flags = 0;
                     resp.error = -EACCES;
-                } else if (v == P_MONITOR_VIOL) {
-                    // Monitor mode: let the kernel re-execute the real connect (CONTINUE).
-                    // ring_push already emitted the event above; resp.flags stays at the
-                    // SECCOMP_USER_NOTIF_FLAG_CONTINUE default set before the nr dispatch.
+                } else if (v == P_MONITOR_VIOL || v == P_BLOCK) {
+                    // CONTINUE: monitor-mode would-block, OR an unidentified (cache-miss)
+                    // deny — let the kernel re-execute the real connect. resp.flags keeps
+                    // the default SECCOMP_USER_NOTIF_FLAG_CONTINUE set before the dispatch.
                 } else {
-                    // Allowed: emulate the connect with the trusted copy (no CONTINUE,
+                    // P_ALLOW / P_NA: emulate the connect with the trusted copy (no CONTINUE,
                     // so the destination can't be swapped after the check).
                     int cfd = (int) req.data.args[0];
                     int r = connect(cfd, (struct sockaddr *) &ss, alen);
