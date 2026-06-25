@@ -7,10 +7,13 @@
 // peer IP back to hostname(s) and glob-match against the allow-list. Loopback and
 // non-INET (AF_UNIX: netd/logd) traffic always passes. IP literals are matched too.
 //
-// DESIGN RULE: a thread-local reentrancy guard makes our own logging path (liblog ->
-// connect/sendto to logd) pass straight through, avoiding recursion/deadlock. The
-// policy mutex is never held while logging. (Production: move logging to an async
-// lock-free ring; here synchronous logging is validated on the target devices.)
+// DESIGN RULE (hot path): nothing in the interceptor path may log synchronously,
+// take a lock, or allocate. connect/sendto/sendmsg/getaddrinfo decisions are pushed
+// into the lock-free event ring (event_ring.h); the JVM drain thread reads them
+// every ~250 ms and calls Observer.record().
+//
+// The thread-local reentrancy guard (in_poseidon) is kept as defence-in-depth
+// even though ring_push no longer calls liblog or any socket function.
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
@@ -22,6 +25,7 @@
 #include "host_match.h"
 #include <stdint.h>
 #include <stddef.h>
+#include <time.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <sys/ioctl.h>
@@ -33,8 +37,40 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include "event_ring.h"
 
+/* LOG is used ONLY for one-time init paths and fatal errors — NEVER on the
+ * hot path (connect/sendto/getaddrinfo decision sites use ring_push instead). */
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, "POSEIDON", __VA_ARGS__)
+
+/* ---- hot-path helpers ---- */
+
+/* Monotonic timestamp in nanoseconds for ring events (vDSO, very cheap). */
+static uint64_t mono_ns(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+/* Destination port from a sockaddr (0 if unknown family). */
+static int get_port(const struct sockaddr *sa) {
+    if (!sa) return 0;
+    if (sa->sa_family == AF_INET)
+        return (int)ntohs(((const struct sockaddr_in *)sa)->sin_port);
+    if (sa->sa_family == AF_INET6)
+        return (int)ntohs(((const struct sockaddr_in6 *)sa)->sin6_port);
+    return 0;
+}
+
+/* Extract the hostname from the "hostname (ipstr)" desc format that
+ * poseidon_check() builds.  Output is truncated to fit ring_event.host[64]. */
+static void desc_host(const char *desc, char *out, size_t sz) {
+    if (!desc || !desc[0]) { out[0] = '\0'; return; }
+    strncpy(out, desc, sz - 1u);
+    out[sz - 1u] = '\0';
+    char *paren = strstr(out, " (");
+    if (paren) *paren = '\0';
+}
 
 // Resolve the calling .so via the wrapper's return address. MUST be expanded inside
 // the interposed wrapper itself (connect/sendto/...) so the return address points
@@ -168,24 +204,29 @@ static int poseidon_check(const struct sockaddr *sa, char *desc, size_t dlen, in
     return enforce ? P_BLOCK : P_MONITOR_VIOL;
 }
 
-// log verdict (caller holds the reentrancy guard); returns 1 if the call must be blocked.
-// `caller` is the originating .so (per-SDK attribution).
-static int act(const char *fn, int verdict, const char *desc, const char *caller) {
-    switch (verdict) {
-        case P_BLOCK: LOG("%s BLOCK [from %s] host not in allow-list: %s", fn, caller, desc); return 1;
-        case P_MONITOR_VIOL: LOG("%s WOULD-BLOCK [from %s] (monitor): %s", fn, caller, desc); return 0;
-        case P_ALLOW: LOG("%s allow [from %s]: %s", fn, caller, desc); return 0; // attribution/audit
-        default: return 0; // P_NA: silent (loopback/AF_UNIX/DNS/unconfigured)
-    }
+// Record verdict via the async ring (HOT PATH — no LOG, no lock, no alloc).
+// `transport`: 0=TCP/unknown  1=UDP  2=DNS.  `tier`: 0=libc  1=seccomp.
+// `origin`: return address into the calling SDK .so (symbolised off-path).
+// Returns 1 if the call must be blocked, 0 otherwise.
+static int act(int verdict, const char *desc, int port, int transport, int tier,
+               uint64_t origin) {
+    if (verdict == P_NA) return 0; // loopback/AF_UNIX/DNS-resolver/unconfigured: silent
+
+    char host[64];
+    desc_host(desc, host, sizeof host);
+    int blocked = (verdict == P_BLOCK) ? 1 : 0;
+    ring_push(mono_ns(), host, port, transport, tier, blocked, origin);
+    return blocked;
 }
 
 int connect(int fd, const struct sockaddr *addr, socklen_t len) {
     int (*real)(int, const struct sockaddr *, socklen_t) = dlsym(RTLD_NEXT, "connect");
     if (in_poseidon) return real(fd, addr, len);
-    const char *caller = CALLER_SO();
     in_poseidon = 1;
     char desc[320];
-    int blk = act("connect()", poseidon_check(addr, desc, sizeof desc, NULL), desc, caller);
+    uint64_t origin = (uint64_t)(uintptr_t)__builtin_return_address(0);
+    int blk = act(poseidon_check(addr, desc, sizeof desc, NULL), desc,
+                  get_port(addr), 0 /*TCP*/, 0 /*libc*/, origin);
     in_poseidon = 0;
     if (blk) { errno = ECONNREFUSED; return -1; }
     return real(fd, addr, len);
@@ -196,10 +237,11 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags,
     ssize_t (*real)(int, const void *, size_t, int, const struct sockaddr *, socklen_t) =
         dlsym(RTLD_NEXT, "sendto");
     if (in_poseidon || !to) return real(fd, buf, n, flags, to, tolen);
-    const char *caller = CALLER_SO();
     in_poseidon = 1;
     char desc[320];
-    int blk = act("sendto()", poseidon_check(to, desc, sizeof desc, NULL), desc, caller);
+    uint64_t origin = (uint64_t)(uintptr_t)__builtin_return_address(0);
+    int blk = act(poseidon_check(to, desc, sizeof desc, NULL), desc,
+                  get_port(to), 1 /*UDP*/, 0 /*libc*/, origin);
     in_poseidon = 0;
     if (blk) { errno = ECONNREFUSED; return -1; }
     return real(fd, buf, n, flags, to, tolen);
@@ -208,10 +250,12 @@ ssize_t sendto(int fd, const void *buf, size_t n, int flags,
 ssize_t sendmsg(int fd, const struct msghdr *msg, int flags) {
     ssize_t (*real)(int, const struct msghdr *, int) = dlsym(RTLD_NEXT, "sendmsg");
     if (in_poseidon || !msg || !msg->msg_name) return real(fd, msg, flags);
-    const char *caller = CALLER_SO();
     in_poseidon = 1;
     char desc[320];
-    int blk = act("sendmsg()", poseidon_check((const struct sockaddr *) msg->msg_name, desc, sizeof desc, NULL), desc, caller);
+    const struct sockaddr *dst = (const struct sockaddr *)msg->msg_name;
+    uint64_t origin = (uint64_t)(uintptr_t)__builtin_return_address(0);
+    int blk = act(poseidon_check(dst, desc, sizeof desc, NULL), desc,
+                  get_port(dst), 1 /*UDP*/, 0 /*libc*/, origin);
     in_poseidon = 0;
     if (blk) { errno = ECONNREFUSED; return -1; }
     return real(fd, msg, flags);
@@ -221,10 +265,12 @@ int sendmmsg(int fd, const struct mmsghdr *msgvec, unsigned int vlen, int flags)
     int (*real)(int, const struct mmsghdr *, unsigned int, int) = dlsym(RTLD_NEXT, "sendmmsg");
     if (in_poseidon || !msgvec || vlen == 0 || !msgvec[0].msg_hdr.msg_name)
         return real(fd, msgvec, vlen, flags);
-    const char *caller = CALLER_SO();
     in_poseidon = 1;
     char desc[320];
-    int blk = act("sendmmsg()", poseidon_check((const struct sockaddr *) msgvec[0].msg_hdr.msg_name, desc, sizeof desc, NULL), desc, caller);
+    const struct sockaddr *dst = (const struct sockaddr *)msgvec[0].msg_hdr.msg_name;
+    uint64_t origin = (uint64_t)(uintptr_t)__builtin_return_address(0);
+    int blk = act(poseidon_check(dst, desc, sizeof desc, NULL), desc,
+                  get_port(dst), 1 /*UDP*/, 0 /*libc*/, origin);
     in_poseidon = 0;
     if (blk) { errno = ECONNREFUSED; return -1; }
     return real(fd, msgvec, vlen, flags);
@@ -246,7 +292,7 @@ int getaddrinfo(const char *node, const char *svc,
         dlsym(RTLD_NEXT, "getaddrinfo");
     if (in_poseidon) return real(node, svc, hints, res);
     if (host_denied(node)) {  // default-deny: refuse to resolve non-allow-listed names
-        in_poseidon = 1; LOG("getaddrinfo() BLOCK not allow-listed: %s", node); in_poseidon = 0;
+        ring_push(mono_ns(), node, 0, 2 /*DNS*/, 0 /*libc*/, 1 /*blocked*/, 0);
         return EAI_FAIL;
     }
     int r = real(node, svc, hints, res);
@@ -271,7 +317,7 @@ int android_getaddrinfofornet(const char *node, const char *svc, const struct ad
     }
     if (in_poseidon) return real(node, svc, hints, netid, mark, res);
     if (host_denied(node)) {
-        in_poseidon = 1; LOG("android_getaddrinfofornet() BLOCK not allow-listed: %s", node); in_poseidon = 0;
+        ring_push(mono_ns(), node, 0, 2 /*DNS*/, 0 /*libc*/, 1 /*blocked*/, 0);
         return EAI_FAIL;
     }
     int r = real(node, svc, hints, netid, mark, res);
@@ -459,12 +505,18 @@ static void *seccomp_supervisor(void *arg) {
                 memcpy(&ss, uaddr, alen);
                 char desc[320];
                 int v = poseidon_check((const struct sockaddr *) &ss, desc, sizeof desc, NULL);
+                if (v == P_BLOCK || v == P_MONITOR_VIOL) {
+                    /* emit to ring (HOT PATH — no LOG) */
+                    char shost[64];
+                    desc_host(desc, shost, sizeof shost);
+                    ring_push(mono_ns(), shost,
+                              get_port((const struct sockaddr *)&ss),
+                              0 /*TCP*/, 1 /*seccomp*/,
+                              (v == P_BLOCK) ? 1 : 0, 0);
+                }
                 if (v == P_BLOCK) {
-                    LOG("connect() [seccomp] BLOCK not allow-listed: %s", desc);
                     resp.flags = 0;
                     resp.error = -EACCES;
-                } else if (v == P_MONITOR_VIOL) {
-                    LOG("connect() [seccomp/observe] would-block (monitor): %s", desc);
                 } else {
                     // Allowed: emulate the connect with the trusted copy (no CONTINUE,
                     // so the destination can't be swapped after the check).
@@ -484,12 +536,12 @@ static void *seccomp_supervisor(void *arg) {
                 char host[256];
                 if (buf && len >= 13 && dns_qname(buf, len, host, sizeof host)) {
                     if (host_denied(host)) {
-                        LOG("dns [seccomp] BLOCK query not allow-listed: %s", host);
+                        ring_push(mono_ns(), host, 53, 2 /*DNS*/, 1 /*seccomp*/, 1 /*blocked*/, 0);
                         resp.flags = 0;
                         resp.error = -EACCES;
                     } else {
                         dnsmap_put((int) req.data.args[0], host);
-                        LOG("dns [seccomp] query: %s", host);
+                        ring_push(mono_ns(), host, 53, 2 /*DNS*/, 1 /*seccomp*/, 0 /*allowed*/, 0);
                     }
                 }
             } else if (dst) {
@@ -497,7 +549,9 @@ static void *seccomp_supervisor(void *arg) {
                 // allow-list, like connect(). Covers raw-syscall WriteToUDP etc.
                 char desc[320];
                 if (poseidon_check(dst, desc, sizeof desc, NULL) == P_BLOCK) {
-                    LOG("sendto() [seccomp] BLOCK not allow-listed: %s", desc);
+                    char shost[64]; desc_host(desc, shost, sizeof shost);
+                    ring_push(mono_ns(), shost, get_port(dst),
+                              1 /*UDP*/, 1 /*seccomp*/, 1 /*blocked*/, 0);
                     resp.flags = 0;
                     resp.error = -EACCES;
                 }
@@ -519,7 +573,9 @@ static void *seccomp_supervisor(void *arg) {
                 if (sockaddr_port(dst) == 53) continue; // resolver handled elsewhere
                 char desc[320];
                 if (poseidon_check(dst, desc, sizeof desc, NULL) == P_BLOCK) {
-                    LOG("sendmsg() [seccomp] BLOCK not allow-listed: %s", desc);
+                    char shost[64]; desc_host(desc, shost, sizeof shost);
+                    ring_push(mono_ns(), shost, get_port(dst),
+                              1 /*UDP*/, 1 /*seccomp*/, 1 /*blocked*/, 0);
                     resp.flags = 0;
                     resp.error = -EACCES;
                     break;
@@ -754,4 +810,47 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configure(
     g_enforce = enforce;
     pthread_mutex_unlock(&g_lock);
     LOG("native policy: %d allowed host(s), enforce=%d", n, enforce);
+}
+
+// ---- JNI: async ring drain (Task 5.1) ----
+// Drains up to 64 ring events per call; returns them as an array of compact
+// strings: "ts|host|port|transport|tier|blocked|origin_addr". The Kotlin drain
+// thread calls this every ~250 ms and parses each string into an EgressEvent.
+// Marshalling with String[] is cheap for 0..64 events per call.
+#define DRAIN_BATCH 64
+JNIEXPORT jobjectArray JNICALL
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_drainEvents(JNIEnv *env, jobject thiz) {
+    (void) thiz;
+    struct ring_event buf[DRAIN_BATCH];
+    int n = ring_drain(buf, DRAIN_BATCH);
+
+    jclass str_class = (*env)->FindClass(env, "java/lang/String");
+    jobjectArray arr = (*env)->NewObjectArray(env, (jsize) n, str_class, NULL);
+    char tmp[256];
+    for (int i = 0; i < n; i++) {
+        snprintf(tmp, sizeof tmp, "%llu|%s|%d|%d|%d|%d|%llu",
+                 (unsigned long long) buf[i].ts,
+                 buf[i].host,
+                 buf[i].port,
+                 buf[i].transport,
+                 buf[i].tier,
+                 buf[i].blocked,
+                 (unsigned long long) buf[i].origin_addr);
+        jstring js = (*env)->NewStringUTF(env, tmp);
+        (*env)->SetObjectArrayElement(env, arr, (jsize) i, js);
+        (*env)->DeleteLocalRef(env, js);
+    }
+    return arr;
+}
+
+// ---- JNI: dladdr-backed symbolizer (Task 5.1) ----
+// Returns the .so path (dli_fname) that contains `addr`, or null. Called
+// off the hot path by the Kotlin drain thread to attribute events to SDKs.
+JNIEXPORT jstring JNICALL
+Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_symbolize(JNIEnv *env, jobject thiz, jlong addr) {
+    (void) thiz;
+    Dl_info info;
+    if (addr != 0 && dladdr((void *)(uintptr_t)(uint64_t) addr, &info) && info.dli_fname)
+        return (*env)->NewStringUTF(env, info.dli_fname);
+    return NULL;
 }

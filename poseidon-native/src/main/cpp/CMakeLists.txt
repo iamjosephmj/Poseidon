@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(poseidon_shim C)
 
-add_library(poseidon_shim SHARED shim.c)
+add_library(poseidon_shim SHARED shim.c event_ring.c)
 
 # Export connect/sendto/… at version node LIBC so they satisfy SDKs' versioned
 # imports (e.g. Cronet's connect@LIBC).
