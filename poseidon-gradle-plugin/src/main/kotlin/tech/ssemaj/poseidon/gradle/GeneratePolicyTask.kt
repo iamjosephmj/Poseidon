@@ -54,15 +54,46 @@ abstract class GeneratePolicyTask : DefaultTask() {
     @TaskAction
     fun generate() {
         // DSL/YAML escape hatch (unchanged path) provides augmenting hosts + fallback mode.
-        val dslHosts = allowedHosts.get().toList()
+        val dslHosts = allowedHosts.get().toMutableList()
         val app = if (appPolicyXml.isPresent && appPolicyXml.get().asFile.exists()) {
             PolicyXml.parseAppPolicy(appPolicyXml.get().asFile.readText())
         } else {
             CompiledPolicy(mode.get(), emptyList(), deniedPaths.get().toList(), dnsCorrelation.get(), emptySet())
         }
+
+        // Fix 1: OR-in the DSL nativeDnsCorrelation so the escape-hatch augments the XML value.
+        var effectiveApp = app.copy(dnsCorrelation = app.dnsCorrelation || dnsCorrelation.get())
+
+        // Fix 2: Parse optional YAML policyFile and union its fields into the compile inputs.
+        if (policyFile.isPresent && policyFile.get().asFile.exists()) {
+            @Suppress("UNCHECKED_CAST")
+            val yaml = Yaml().load<Map<String, Any?>>(policyFile.get().asFile.readText())
+            if (yaml != null) {
+                // YAML allowedHosts → union into dslHosts
+                (yaml["allowedHosts"] as? List<*>)?.filterIsInstance<String>()?.forEach { host ->
+                    if (host !in dslHosts) dslHosts.add(host)
+                }
+                // YAML deniedPaths → union into effectiveApp.deniedPaths
+                val yamlDenied = (yaml["deniedPaths"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                if (yamlDenied.isNotEmpty()) {
+                    effectiveApp = effectiveApp.copy(
+                        deniedPaths = (effectiveApp.deniedPaths + yamlDenied).distinct()
+                    )
+                }
+                // YAML mode (if present) → override effectiveApp.mode
+                (yaml["mode"] as? String)?.let { yamlMode ->
+                    effectiveApp = effectiveApp.copy(mode = yamlMode)
+                }
+                // YAML nativeDnsCorrelation → OR into effectiveApp.dnsCorrelation
+                if (yaml["nativeDnsCorrelation"] == true) {
+                    effectiveApp = effectiveApp.copy(dnsCorrelation = true)
+                }
+            }
+        }
+
         // Library proposals are merged into the manifest by AGP; for now read none here
         // (Task 2.4 wires the merged-manifest proposal extraction). Empty list = app-only.
-        val result = PolicyCompiler.compile(app, proposals = emptyList(), dslHosts = dslHosts,
+        val result = PolicyCompiler.compile(effectiveApp, proposals = emptyList(), dslHosts = dslHosts,
             acceptProposals = acceptProposals.get())
 
         val dir = File(outputDir.get().asFile, "poseidon").apply { mkdirs() }
