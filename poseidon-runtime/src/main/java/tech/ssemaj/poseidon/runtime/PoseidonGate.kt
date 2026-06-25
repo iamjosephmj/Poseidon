@@ -9,6 +9,12 @@ package tech.ssemaj.poseidon.runtime
 object PoseidonGate {
     private val seeded = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
+    /**
+     * TEST-ONLY: clears the seeded host set so each test starts from a clean slate.
+     * Must not be called from production code.
+     */
+    @JvmStatic fun resetForTest() { seeded.clear() }
+
     @JvmStatic
     fun shouldBlock(host: String, path: String): Boolean {
         val event = EgressEvent(

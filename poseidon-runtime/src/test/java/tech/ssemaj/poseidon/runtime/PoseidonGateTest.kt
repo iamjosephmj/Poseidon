@@ -10,9 +10,10 @@ class PoseidonGateTest {
     private val seen = CopyOnWriteArrayList<EgressEvent>()
 
     @Before fun setup() {
+        PoseidonGate.resetForTest()          // clear seeded host cache between tests
+        seen.clear()                          // clear accumulated events from prior tests
         PolicyEngine.configure(listOf("example.com"), listOf("/blocked/*"))
         Observer.setSink { seen.add(it) }
-        seen.clear()
     }
 
     @Test fun enforceBlocksUnlistedHostAndRecords() {
