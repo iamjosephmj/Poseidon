@@ -49,6 +49,9 @@ poseidon {
     // without touching the XML resource).
     nativeDnsCorrelation = true // opt in to Go/raw-syscall DNS correlation (costly; demo)
     // proposalsAction = "error"  // uncomment in CI to fail on unapproved library proposals
+    // This app depends on :poseidon-all (includes libposeidon_shim.so), so enable ELF injection
+    // so that native-SDK (libc) traffic — e.g. libcronet — is also host-enforced.
+    injectNative = true
 }
 
 dependencies {

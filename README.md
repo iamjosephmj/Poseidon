@@ -17,15 +17,22 @@ in-process, no VPN, no root.
 | **`poseidon-gradle-plugin`** | manifest → compiled policy, bytecode transform registration, native-inject task wiring | — | yes |
 | **`poseidon-all`** | umbrella artifact depending on core + native + seccomp | — | convenience |
 
-The JVM+manifest story (core + plugin) is Play-clean and stands alone. Native and seccomp
-layer on top for power users who need coverage below the JVM.
+The JVM+manifest story (core + plugin) is **Play-clean and stands alone** — no binary
+modification occurs and `injectNative` defaults to `false`. Native and seccomp layer on
+top for power users who need coverage below the JVM. To enable libc-level host enforcement
+(e.g. Cronet, other native SDKs), depend on `:poseidon-native` or `:poseidon-all` and set
+`poseidon { injectNative = true }` in your app's `build.gradle.kts`.
+
+> **Note:** The seccomp Go/raw-syscall gate ships inside `libposeidon_shim.so`; depending
+> on `:poseidon-native` (or `:poseidon-all`) already includes it. `:poseidon-seccomp` is
+> a marker module for the opt-in native tier and is not a separate runtime artifact.
 
 ---
 
 ## Configuration — manifest-first
 
 The allow-list is declared as an XML resource in your app manifest (NSC-style,
-merger-safe). The Gradle plugin compiles it into `assets/poseidon/policy.bin` at build
+merger-safe). The Gradle plugin compiles it into `assets/poseidon/policy.json` at build
 time and produces a human-readable build report of the effective allow-list plus every
 SDK proposal.
 

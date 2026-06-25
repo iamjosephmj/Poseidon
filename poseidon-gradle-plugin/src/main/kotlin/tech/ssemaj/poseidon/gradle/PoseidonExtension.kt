@@ -33,4 +33,12 @@ open class PoseidonExtension {
 
     /** Unapproved proposals: "warn" (default) logs them; "error" fails the build (CI gate). */
     var proposalsAction: String = "warn"
+
+    /**
+     * Opt-in: inject the libposeidon_shim.so DT_NEEDED into the app's native libraries at
+     * build time so native-SDK (libc) traffic is host-enforced. Requires the shim to be
+     * packaged (depend on :poseidon-native or :poseidon-all). Default OFF keeps the
+     * JVM-only :poseidon-core configuration Play-clean (no binary modification).
+     */
+    var injectNative: Boolean = false
 }

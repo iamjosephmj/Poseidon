@@ -54,21 +54,26 @@ class PoseidonPlugin : Plugin<Project> {
             // place, AFTER strip and BEFORE package — no re-sign, nothing after R8.
             // (AGP exposes native libs only as internal Replaceable artifacts, so we
             // hook the task graph rather than the Artifacts API.)
-            val inject = project.tasks.register(
-                "poseidonInjectNative$cap", PoseidonNativeInjectTask::class.java,
-            )
-            inject.configure {
-                strippedDir.set(
-                    project.layout.buildDirectory.dir("intermediates/stripped_native_libs/${variant.name}"),
+            // Gated by ext.injectNative (default false) — keeps the JVM-only
+            // :poseidon-core path Play-clean (no binary modification). Consumers that
+            // depend on :poseidon-native or :poseidon-all must set injectNative = true.
+            if (ext.injectNative) {
+                val inject = project.tasks.register(
+                    "poseidonInjectNative$cap", PoseidonNativeInjectTask::class.java,
                 )
-                // Ordering only (lenient: ignored if the task name differs/absent),
-                // so we don't force creation of AGP's strip task.
-                mustRunAfter("strip${cap}DebugSymbols")
-            }
-            // Both the APK packager and the AAB pre-bundle consume the (now-injected)
-            // stripped libs; AGP signs each normally afterward (no re-sign).
-            project.tasks.configureEach {
-                if (name == "package$cap" || name == "build${cap}PreBundle") dependsOn(inject)
+                inject.configure {
+                    strippedDir.set(
+                        project.layout.buildDirectory.dir("intermediates/stripped_native_libs/${variant.name}"),
+                    )
+                    // Ordering only (lenient: ignored if the task name differs/absent),
+                    // so we don't force creation of AGP's strip task.
+                    mustRunAfter("strip${cap}DebugSymbols")
+                }
+                // Both the APK packager and the AAB pre-bundle consume the (now-injected)
+                // stripped libs; AGP signs each normally afterward (no re-sign).
+                project.tasks.configureEach {
+                    if (name == "package$cap" || name == "build${cap}PreBundle") dependsOn(inject)
+                }
             }
         }
     }
