@@ -18,3 +18,6 @@ local.properties
 **/build/
 .kotlin/
 .cxx/
+
+# SDD scratch (ledger, task briefs/reports, review diffs)
+.superpowers/
