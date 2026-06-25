@@ -517,6 +517,10 @@ static void *seccomp_supervisor(void *arg) {
                 if (v == P_BLOCK) {
                     resp.flags = 0;
                     resp.error = -EACCES;
+                } else if (v == P_MONITOR_VIOL) {
+                    // Monitor mode: let the kernel re-execute the real connect (CONTINUE).
+                    // ring_push already emitted the event above; resp.flags stays at the
+                    // SECCOMP_USER_NOTIF_FLAG_CONTINUE default set before the nr dispatch.
                 } else {
                     // Allowed: emulate the connect with the trusted copy (no CONTINUE,
                     // so the destination can't be swapped after the check).
