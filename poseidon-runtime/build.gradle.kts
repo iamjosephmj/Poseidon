@@ -34,6 +34,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -44,4 +51,7 @@ dependencies {
     compileOnly("org.chromium.net:cronet-embedded:143.7445.0")
     // Auto-loads the compiled policy asset at process start.
     implementation("androidx.startup:startup-runtime:1.1.1")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
 }
