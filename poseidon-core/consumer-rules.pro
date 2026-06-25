@@ -6,7 +6,7 @@
 -keep class tech.ssemaj.poseidon.runtime.NativeBridge { *; }
 
 # Startup initializer referenced by fully-qualified name in the merged manifest.
--keep class tech.ssemaj.poseidon.runtime.PoseidonInitializer { <init>(...); }
+-keep class tech.ssemaj.poseidon.runtime.PoseidonInitializer { *; }
 
 # Entry points referenced from the bytecode the Gradle plugin injects.
 -keep class tech.ssemaj.poseidon.runtime.PoseidonOkHttp { *; }

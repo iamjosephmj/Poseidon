@@ -29,7 +29,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Poseidon"
 include(":app")
-include(":poseidon-runtime")
 include(":poseidon-core")
 include(":poseidon-native")
 include(":poseidon-seccomp")
