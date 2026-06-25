@@ -1,0 +1,5 @@
+# Poseidon policy (merged on top of the build.gradle.kts `poseidon { }` DSL).
+# Path deny-list: block these endpoints on otherwise-allowed hosts.
+deniedPaths:
+  - /blocked
+  - /blocked/*
