@@ -26,6 +26,7 @@ class PoseidonPlugin : Plugin<Project> {
             val md = ext.mode
             val pf = ext.policyFile
             val dns = ext.nativeDnsCorrelation
+            val mergedManifestProvider = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST)
             val genTask = project.tasks.register("generatePoseidonPolicy$cap", GeneratePolicyTask::class.java)
             genTask.configure {
                 allowedHosts.set(hosts)
@@ -36,6 +37,7 @@ class PoseidonPlugin : Plugin<Project> {
                 proposalsAction.set(ext.proposalsAction)
                 acceptProposals.set(ext.acceptProposals)
                 ext.policyXml?.let { appPolicyXml.set(project.layout.projectDirectory.file(it)) }
+                mergedManifest.set(mergedManifestProvider)
             }
             variant.sources.assets?.addGeneratedSourceDirectory(genTask) { it.outputDir }
             // Path layer: inject HTTP-client adapters (OkHttp interceptor, HttpURLConnection

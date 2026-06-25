@@ -42,6 +42,11 @@ abstract class GeneratePolicyTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val appPolicyXml: RegularFileProperty
 
+    @get:InputFile
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val mergedManifest: RegularFileProperty
+
     @get:Input
     abstract val proposalsAction: Property<String>
 
@@ -91,9 +96,10 @@ abstract class GeneratePolicyTask : DefaultTask() {
             }
         }
 
-        // Library proposals are merged into the manifest by AGP; for now read none here
-        // (Task 2.4 wires the merged-manifest proposal extraction). Empty list = app-only.
-        val result = PolicyCompiler.compile(effectiveApp, proposals = emptyList(), dslHosts = dslHosts,
+        // Extract library proposals from the merged manifest when available.
+        val proposals = if (mergedManifest.isPresent && mergedManifest.get().asFile.exists())
+            extractProposals(mergedManifest.get().asFile.readText()) else emptyList()
+        val result = PolicyCompiler.compile(effectiveApp, proposals = proposals, dslHosts = dslHosts,
             acceptProposals = acceptProposals.get())
 
         val dir = File(outputDir.get().asFile, "poseidon").apply { mkdirs() }
@@ -103,6 +109,25 @@ abstract class GeneratePolicyTask : DefaultTask() {
         if (result.unapprovedProposals.isNotEmpty()) {
             val msg = "[poseidon] ${result.unapprovedProposals.size} unapproved library proposal(s)"
             if (proposalsAction.get() == "error") error(msg) else logger.warn(msg)
+        }
+    }
+
+    companion object {
+        /** Reads inline poseidon proposal meta-data from a merged manifest. */
+        fun extractProposals(manifestXml: String): List<Proposal> {
+            val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder()
+                .parse(java.io.ByteArrayInputStream(manifestXml.toByteArray()))
+            val nodes = doc.getElementsByTagName("meta-data")
+            val out = mutableListOf<Proposal>()
+            for (i in 0 until nodes.length) {
+                val el = nodes.item(i) as org.w3c.dom.Element
+                if (el.getAttribute("android:name") != "tech.ssemaj.poseidon.proposes") continue
+                val lib = el.getAttribute("tools:node").ifEmpty { "unknown" }
+                el.getAttribute("android:value").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    .forEach { out.add(Proposal(lib, it)) }
+            }
+            return out
         }
     }
 }
