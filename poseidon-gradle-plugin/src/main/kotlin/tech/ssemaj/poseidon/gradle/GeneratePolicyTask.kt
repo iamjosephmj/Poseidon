@@ -37,35 +37,41 @@ abstract class GeneratePolicyTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val policyFile: RegularFileProperty
 
+    @get:InputFile
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val appPolicyXml: RegularFileProperty
+
+    @get:Input
+    abstract val proposalsAction: Property<String>
+
+    @get:Input
+    abstract val acceptProposals: Property<Boolean>
+
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
     @TaskAction
     fun generate() {
-        val hosts = allowedHosts.get().toMutableList()
-        val paths = deniedPaths.get().toMutableList()
-        var m = mode.get()
-        var dns = dnsCorrelation.get()
-
-        if (policyFile.isPresent && policyFile.get().asFile.exists()) {
-            @Suppress("UNCHECKED_CAST")
-            val y = Yaml().load<Map<String, Any?>>(policyFile.get().asFile.readText()) ?: emptyMap()
-            (y["allowedHosts"] as? List<*>)?.forEach { hosts.add(it.toString()) }
-            (y["deniedPaths"] as? List<*>)?.forEach { paths.add(it.toString()) }
-            (y["mode"] as? String)?.let { m = it }
-            (y["nativeDnsCorrelation"] as? Boolean)?.let { dns = it }
+        // DSL/YAML escape hatch (unchanged path) provides augmenting hosts + fallback mode.
+        val dslHosts = allowedHosts.get().toList()
+        val app = if (appPolicyXml.isPresent && appPolicyXml.get().asFile.exists()) {
+            PolicyXml.parseAppPolicy(appPolicyXml.get().asFile.readText())
+        } else {
+            CompiledPolicy(mode.get(), emptyList(), deniedPaths.get().toList(), dnsCorrelation.get(), emptySet())
         }
+        // Library proposals are merged into the manifest by AGP; for now read none here
+        // (Task 2.4 wires the merged-manifest proposal extraction). Empty list = app-only.
+        val result = PolicyCompiler.compile(app, proposals = emptyList(), dslHosts = dslHosts,
+            acceptProposals = acceptProposals.get())
 
-        val json = buildString {
-            append("{\"mode\":\"").append(m).append("\",")
-            append("\"dnsCorrelation\":").append(dns).append(",")
-            append("\"allowedHosts\":[").append(hosts.distinct().joinToString(",") { jstr(it) }).append("],")
-            append("\"deniedPaths\":[").append(paths.distinct().joinToString(",") { jstr(it) }).append("]}")
-        }
         val dir = File(outputDir.get().asFile, "poseidon").apply { mkdirs() }
-        File(dir, "policy.json").writeText(json)
-        logger.lifecycle("[poseidon] policy: mode=$m, ${hosts.size} allowed host(s), ${paths.size} denied path(s)")
+        File(dir, "policy.json").writeText(result.policyJson)
+        File(dir, "policy-report.txt").writeText(result.report)
+        logger.lifecycle("[poseidon] ${result.report.lines().first()}")
+        if (result.unapprovedProposals.isNotEmpty()) {
+            val msg = "[poseidon] ${result.unapprovedProposals.size} unapproved library proposal(s)"
+            if (proposalsAction.get() == "error") error(msg) else logger.warn(msg)
+        }
     }
-
-    private fun jstr(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 }

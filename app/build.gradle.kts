@@ -44,11 +44,11 @@ android {
 }
 
 poseidon {
-    // Host allow-list (default-deny) from the DSL; path deny-list from the YAML.
-    allowedHosts.add("example.com")
-    mode = "enforce"
-    policyFile = "poseidon-policy.yml"
+    // policyXml (default: src/main/res/xml/poseidon_policy.xml) is the canonical source.
+    // Use DSL fields below only as an escape hatch (e.g. adding extra hosts or overriding mode
+    // without touching the XML resource).
     nativeDnsCorrelation = true // opt in to Go/raw-syscall DNS correlation (costly; demo)
+    // proposalsAction = "error"  // uncomment in CI to fail on unapproved library proposals
 }
 
 dependencies {

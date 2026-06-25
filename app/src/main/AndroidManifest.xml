@@ -13,6 +13,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Poseidon">
+        <meta-data android:name="tech.ssemaj.poseidon.policy"
+            android:resource="@xml/poseidon_policy"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -33,6 +33,9 @@ class PoseidonPlugin : Plugin<Project> {
                 mode.set(md)
                 dnsCorrelation.set(dns)
                 if (pf != null) policyFile.set(project.layout.projectDirectory.file(pf))
+                proposalsAction.set(ext.proposalsAction)
+                acceptProposals.set(ext.acceptProposals)
+                ext.policyXml?.let { appPolicyXml.set(project.layout.projectDirectory.file(it)) }
             }
             variant.sources.assets?.addGeneratedSourceDirectory(genTask) { it.outputDir }
             // Path layer: inject HTTP-client adapters (OkHttp interceptor, HttpURLConnection
