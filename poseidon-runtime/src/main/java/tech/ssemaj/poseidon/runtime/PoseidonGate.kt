@@ -13,7 +13,18 @@ object PoseidonGate {
         val hostDecision = PolicyEngine.evaluateHost(host, -1)
         val decision = if (hostDecision.block) hostDecision
         else PolicyEngine.evaluatePath(host, path)
-        Observer.record(host, path, decision, Mode.current)
+        val event = EgressEvent(
+            ts = System.currentTimeMillis(),
+            tid = Thread.currentThread().id.toInt(),
+            host = host,
+            ip = null,
+            port = 0,
+            transport = Transport.TCP,
+            path = path,
+            tier = Tier.JVM,
+            decision = decision
+        )
+        Observer.record(event)
         val block = Mode.current == Mode.ENFORCE && decision.block
         // Allowed host: seed the native cache with its IPs (once) so the seccomp
         // connect gate recognizes them — fixes strict-mode over-block for JVM clients
