@@ -23,8 +23,12 @@ object PolicyXml {
     }
 
     private fun Element.childElements(tag: String): List<Element> {
-        val nodes = getElementsByTagName(tag)
-        return (0 until nodes.length).map { nodes.item(it) as Element }
+        val result = mutableListOf<Element>()
+        for (i in 0 until childNodes.length) {
+            val node = childNodes.item(i)
+            if (node is Element && node.nodeName == tag) result.add(node)
+        }
+        return result
     }
 
     fun parseAppPolicy(xml: String): CompiledPolicy {

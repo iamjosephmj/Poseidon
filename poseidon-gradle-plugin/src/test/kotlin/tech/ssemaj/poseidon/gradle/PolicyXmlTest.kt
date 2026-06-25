@@ -27,4 +27,15 @@ class PolicyXmlTest {
         val props = PolicyXml.parseProposals("com.foo.sdk", lib)
         assertEquals(listOf(Proposal("com.foo.sdk", "telemetry.sdk.com")), props)
     }
+
+    @Test fun ignoresNonDirectChildAllow() {
+        val xml = """
+            <poseidon mode="enforce">
+              <allow host="top.com"/>
+              <group><allow host="nested.com"/></group>
+            </poseidon>
+        """.trimIndent()
+        val p = PolicyXml.parseAppPolicy(xml)
+        assertEquals(listOf("top.com"), p.allowedHosts)
+    }
 }
