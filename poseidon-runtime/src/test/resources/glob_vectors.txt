@@ -1,0 +1,10 @@
+# pattern|value|expect
+example.com|example.com|1
+example.com|evil.test|0
+*.api.foo.com|v2.api.foo.com|1
+*.api.foo.com|api.foo.com|0
+*.example.com|a.b.example.com|1
+/internal/*|/internal/secrets|1
+/internal/*|/public|0
+/|/|1
+*|anything|1

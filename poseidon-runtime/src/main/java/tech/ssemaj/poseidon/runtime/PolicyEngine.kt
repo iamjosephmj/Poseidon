@@ -38,6 +38,10 @@ object PolicyEngine {
         return Decision(Action.ALLOW, matchedRule = allowRule, reason = "")
     }
 
+    /** Visible for the equivalence suite; mirrors the native fnmatch semantics. */
+    @JvmStatic
+    fun matches(pattern: String, value: String): Boolean = glob(pattern, value)
+
     private fun glob(pattern: String, value: String): Boolean {
         val regex = buildString {
             append('^')
