@@ -7,7 +7,9 @@ import org.junit.Test
 class PolicyEngineSmokeTest {
     @Test fun allowListBlocksUnlistedHost() {
         PolicyEngine.configure(allowedHosts = listOf("example.com"), deniedPaths = emptyList())
-        assertTrue(PolicyEngine.evaluateHost("evil.test", -1).block)
-        assertFalse(PolicyEngine.evaluateHost("example.com", -1).block)
+        val blocked = EgressEvent(ts = 0, tid = 0, host = "evil.test", ip = null, port = -1, transport = Transport.TCP, tier = Tier.JVM)
+        val allowed = EgressEvent(ts = 0, tid = 0, host = "example.com", ip = null, port = -1, transport = Transport.TCP, tier = Tier.JVM)
+        assertTrue(PolicyEngine.evaluate(blocked).block)
+        assertFalse(PolicyEngine.evaluate(allowed).block)
     }
 }

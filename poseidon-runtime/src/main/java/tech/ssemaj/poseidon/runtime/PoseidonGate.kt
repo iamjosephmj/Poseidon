@@ -1,34 +1,26 @@
 package tech.ssemaj.poseidon.runtime
 
 /**
- * Shared policy gate used by every JVM HTTP-client adapter (OkHttp, HttpURLConnection,
- * …). Host allow-list first, then path deny-list; records the decision; returns
- * whether the request must be blocked (ENFORCE + violation).
+ * Thin JVM-tier producer: builds an EgressEvent, runs it through the one PolicyEngine,
+ * records via the one Observer, and returns the Enforcer's gate. The seccomp IP-cache
+ * seed for allowed hosts (so the connect gate recognizes platform-resolved IPs) stays
+ * here — it is a JVM-tier side effect, not a policy decision.
  */
 object PoseidonGate {
     private val seeded = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     @JvmStatic
     fun shouldBlock(host: String, path: String): Boolean {
-        val hostDecision = PolicyEngine.evaluateHost(host, -1)
-        val decision = if (hostDecision.block) hostDecision
-        else PolicyEngine.evaluatePath(host, path)
         val event = EgressEvent(
             ts = System.currentTimeMillis(),
-            tid = Thread.currentThread().id.toInt(),
-            host = host,
-            ip = null,
-            port = 0,
-            transport = Transport.TCP,
-            path = path,
-            tier = Tier.JVM,
-            decision = decision
+            tid = android.os.Process.myTid(),
+            host = host, ip = null, port = -1,
+            transport = Transport.TCP, path = path, tier = Tier.JVM,
         )
+        val decision = PolicyEngine.evaluate(event)
+        event.decision = decision
         Observer.record(event)
-        val block = Mode.current == Mode.ENFORCE && decision.block
-        // Allowed host: seed the native cache with its IPs (once) so the seccomp
-        // connect gate recognizes them — fixes strict-mode over-block for JVM clients
-        // whose platform resolution our libc hook never sees.
+        val block = Enforcer.shouldBlock(decision)
         if (!block && host.isNotEmpty() && seeded.add(host)) {
             try {
                 val ips = java.net.InetAddress.getAllByName(host).mapNotNull { it.hostAddress }
