@@ -86,7 +86,7 @@ Create **`app/src/main/res/xml/poseidon_policy.xml`**:
     <allow host="example.com"/>                 <!-- ✅ may talk to example.com          -->
     <allow host="*.api.mybackend.com"/>         <!-- ✅ wildcard: any subdomain           -->
 
-    <deny-path pattern="/internal/*"/>          <!-- 🚫 never allow these URL paths        -->
+    <deny-path pattern="/internal/*"/>          <!-- 🚫 block URL paths (JVM/HTTP clients only) -->
 
     <allow-cidr value="104.16.0.0/13"/>         <!-- ✅ allow an IP range (native/Go calls)-->
 
@@ -103,6 +103,10 @@ Then point your **`AndroidManifest.xml`** at it (inside `<application>`):
 
 **That's it.** Add one `<allow host>` and everything else is denied by default. No code to
 write — the HTTP clients and native libraries are wired up automatically at build time.
+
+> ⚠️ **Host rules apply to every layer; `deny-path` applies only to JVM HTTP clients.**
+> Native (C/C++) and Go/raw traffic is wrapped in TLS before Poseidon sees it, so there only
+> the destination **host** — not the URL **path** — can be enforced.
 
 ### 3. See what each SDK does
 
