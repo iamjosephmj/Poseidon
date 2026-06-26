@@ -22,6 +22,15 @@ import java.util.concurrent.Executors
 object CronetProbe {
     private const val TAG = "PoseidonDemo"
 
+    /** Direct buffer capacity in bytes for Cronet read callbacks. */
+    private const val READ_BUFFER_BYTES = 8192
+
+    /**
+     * Allow-listed root URL exercised via Cronet's native stack — expect HTTP 200 success.
+     * Distinct from [DemoUrls.ALLOWED] which targets a sub-path; Cronet probes the root.
+     */
+    private const val CRONET_ALLOWED_URL = "https://example.com/"
+
     fun run(ctx: Context) {
         val engine = CronetEngine.Builder(ctx).build()
         val exec = Executors.newSingleThreadExecutor()
@@ -30,7 +39,7 @@ object CronetProbe {
             override fun onRedirectReceived(r: UrlRequest, i: UrlResponseInfo, u: String) =
                 r.followRedirect()
             override fun onResponseStarted(r: UrlRequest, i: UrlResponseInfo) {
-                r.read(ByteBuffer.allocateDirect(8192))
+                r.read(ByteBuffer.allocateDirect(READ_BUFFER_BYTES))
             }
             override fun onReadCompleted(r: UrlRequest, i: UrlResponseInfo, b: ByteBuffer) {
                 b.clear(); r.read(b)
@@ -44,7 +53,7 @@ object CronetProbe {
         }
 
         // example.com is in the allow-list -> native allows; google is not -> native blocks.
-        for (url in listOf("https://example.com/", DemoUrls.DENIED_HOST)) {
+        for (url in listOf(CRONET_ALLOWED_URL, DemoUrls.DENIED_HOST)) {
             engine.newUrlRequestBuilder(url, cb(url), exec).build().start()
         }
     }

@@ -16,6 +16,9 @@ import java.util.concurrent.Executors
 object HttpUrlConnectionProbe {
     private const val TAG = "PoseidonDemo"
 
+    /** Connection timeout in milliseconds for HttpURLConnection demo calls. */
+    private const val CONNECT_TIMEOUT_MS = 4000
+
     fun run() {
         Executors.newSingleThreadExecutor().execute {
             for (spec in listOf(
@@ -24,8 +27,9 @@ object HttpUrlConnectionProbe {
                 DemoUrls.DENIED_HOST,  // host NOT allow-listed
             )) {
                 try {
-                    val c = URL(spec).openConnection() as HttpURLConnection
-                    c.connectTimeout = 4000
+                    val c = (URL(spec).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                    }
                     val code = c.responseCode
                     Log.i(TAG, "huc $spec -> $code")
                     c.disconnect()
