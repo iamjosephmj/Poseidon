@@ -11,5 +11,11 @@
 jdk:
   - openjdk17
 
+# The :app module applies the standalone poseidon-gradle-plugin, so Gradle's configuration
+# phase needs it on the classpath even though we only publish the libraries. Publish the
+# plugin to mavenLocal first — settings.gradle's pluginManagement resolves it from there.
+before_install:
+  - ./gradlew -p poseidon-gradle-plugin publishToMavenLocal --no-daemon
+
 install:
   - ./gradlew clean :poseidon-core:publishToMavenLocal :poseidon-native:publishToMavenLocal :poseidon-seccomp:publishToMavenLocal :poseidon-all:publishToMavenLocal --no-daemon --stacktrace
