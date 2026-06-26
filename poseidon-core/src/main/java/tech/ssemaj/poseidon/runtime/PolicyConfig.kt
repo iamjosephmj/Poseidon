@@ -1,0 +1,10 @@
+package tech.ssemaj.poseidon.runtime
+
+/** Parsed value object from poseidon/policy.json. */
+internal data class PolicyConfig(
+    val mode: Mode,
+    val allowedHosts: List<String>,
+    val deniedPaths: List<String>,
+    val allowedCidrs: List<String>,
+    val dnsCorrelation: Boolean,
+)

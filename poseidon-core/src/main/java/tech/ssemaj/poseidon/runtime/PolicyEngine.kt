@@ -19,41 +19,20 @@ object PolicyEngine {
     @JvmStatic
     fun evaluate(event: EgressEvent): Decision {
         val host = event.host
-        if (allowedHosts.isNotEmpty()) {
-            val matched = host?.let { h -> allowedHosts.firstOrNull { glob(it, h) } }
-            if (matched == null) {
-                return Decision(Action.BLOCK, matchedRule = "default-deny", reason = "host not in allow-list")
-            }
+        val matchedAllowRule = host?.let { h -> allowedHosts.firstOrNull { Glob.matches(it, h) } }
+        if (allowedHosts.isNotEmpty() && matchedAllowRule == null) {
+            return Decision(Action.BLOCK, matchedRule = "default-deny", reason = "host not in allow-list")
         }
         if (event.tier == Tier.JVM) {
             val path = event.path
             if (path != null) {
-                val deny = deniedPaths.firstOrNull { glob(it, path) }
+                val deny = deniedPaths.firstOrNull { Glob.matches(it, path) }
                 if (deny != null) {
                     return Decision(Action.BLOCK, matchedRule = "deny-path:$deny", reason = "path in deny-list")
                 }
             }
         }
-        val allowRule = host?.let { h -> allowedHosts.firstOrNull { glob(it, h) } }?.let { "allow:$it" }
+        val allowRule = matchedAllowRule?.let { "allow:$it" }
         return Decision(Action.ALLOW, matchedRule = allowRule, reason = "")
-    }
-
-    /** Visible for the equivalence suite; mirrors the native fnmatch semantics. */
-    @JvmStatic
-    fun matches(pattern: String, value: String): Boolean = glob(pattern, value)
-
-    private fun glob(pattern: String, value: String): Boolean {
-        val regex = buildString {
-            append('^')
-            for (c in pattern) when (c) {
-                '*' -> append(".*")
-                '.', '?', '+', '(', ')', '[', ']', '{', '}', '\\', '^', '$', '|' -> {
-                    append('\\'); append(c)
-                }
-                else -> append(c)
-            }
-            append('$')
-        }
-        return Regex(regex).matches(value)
     }
 }

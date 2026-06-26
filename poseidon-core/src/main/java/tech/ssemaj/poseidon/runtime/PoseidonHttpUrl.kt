@@ -1,3 +1,5 @@
+@file:OptIn(InternalPoseidonApi::class)
+
 package tech.ssemaj.poseidon.runtime
 
 import java.io.IOException
@@ -12,6 +14,7 @@ import java.net.URLConnection
  * rewriting is used instead of instrumenting the class). Covers raw
  * HttpURLConnection, Volley's HurlStack, and Ktor's Android engine.
  */
+@InternalPoseidonApi
 object PoseidonHttpUrl {
     @JvmStatic
     @Throws(IOException::class)
@@ -35,9 +38,8 @@ object PoseidonHttpUrl {
     }
 
     private fun guard(url: URL) {
-        val path = url.path?.ifEmpty { "/" } ?: "/"
-        if (PoseidonGate.shouldBlock(url.host, path)) {
-            throw IOException("Blocked by Poseidon: ${url.host}$path")
+        if (PoseidonGate.shouldBlock(url.host, normalizePath(url.path))) {
+            throw IOException("Blocked by Poseidon: ${url.host}${url.path ?: ""}")
         }
     }
 }

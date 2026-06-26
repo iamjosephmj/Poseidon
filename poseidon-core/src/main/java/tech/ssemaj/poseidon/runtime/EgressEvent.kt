@@ -1,18 +1,5 @@
 package tech.ssemaj.poseidon.runtime
 
-enum class Transport { TCP, UDP, DNS }
-enum class Tier { JVM, NATIVE, SECCOMP }
-enum class Action { ALLOW, BLOCK }
-
-/** Result of a policy lookup. matchedRule is the glob/rule that decided it (for audit). */
-data class Decision(
-    val action: Action,
-    val matchedRule: String? = null,
-    val reason: String = "",
-) {
-    val block: Boolean get() = action == Action.BLOCK
-}
-
 /**
  * Source-agnostic egress record. Interceptors fill everything except [decision];
  * PolicyEngine fills [decision]. The engine, sink, and enforcer never branch on [tier].

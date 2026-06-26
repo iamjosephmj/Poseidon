@@ -1,3 +1,5 @@
+@file:OptIn(InternalPoseidonApi::class)
+
 package tech.ssemaj.poseidon.runtime
 
 import org.chromium.net.CronetEngine
@@ -11,6 +13,7 @@ import java.util.concurrent.Executor
  * BLOCK for Cronet is enforced by the native shim (Cronet's TLS is native, so the
  * path can't be blocked below the Java layer); here we record/observe the path.
  */
+@InternalPoseidonApi
 object PoseidonCronet {
     @JvmStatic
     fun newUrlRequestBuilder(
@@ -21,7 +24,7 @@ object PoseidonCronet {
     ): UrlRequest.Builder {
         try {
             val u = URL(url)
-            PoseidonGate.shouldBlock(u.host, u.path?.ifEmpty { "/" } ?: "/")
+            PoseidonGate.shouldBlock(u.host, normalizePath(u.path))
         } catch (_: Throwable) {
         }
         return engine.newUrlRequestBuilder(url, callback, executor)

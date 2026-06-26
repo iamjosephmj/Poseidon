@@ -4,14 +4,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class EnforcerTest {
+class ModeGateTest {
     @Test fun monitorNeverBlocks() {
         Mode.current = Mode.MONITOR
-        assertFalse(Enforcer.shouldBlock(Decision(Action.BLOCK, reason = "x")))
+        assertFalse(ModeGate.shouldBlock(Decision(Action.BLOCK, reason = "x")))
     }
     @Test fun enforceBlocksOnBlockDecision() {
         Mode.current = Mode.ENFORCE
-        assertTrue(Enforcer.shouldBlock(Decision(Action.BLOCK, reason = "x")))
-        assertFalse(Enforcer.shouldBlock(Decision(Action.ALLOW)))
+        assertTrue(ModeGate.shouldBlock(Decision(Action.BLOCK, reason = "x")))
+        assertFalse(ModeGate.shouldBlock(Decision(Action.ALLOW)))
     }
 }

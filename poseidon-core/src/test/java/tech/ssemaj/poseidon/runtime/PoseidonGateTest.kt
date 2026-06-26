@@ -1,3 +1,5 @@
+@file:OptIn(InternalPoseidonApi::class)
+
 package tech.ssemaj.poseidon.runtime
 
 import org.junit.Assert.assertFalse

@@ -1,0 +1,31 @@
+@file:OptIn(InternalPoseidonApi::class)
+
+package tech.ssemaj.poseidon.runtime
+
+import java.net.InetAddress
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Seeds the native IP cache the first time a JVM-layer allowed host is resolved.
+ * This lets the seccomp connect() gate recognize platform-resolved IPs without a
+ * host-name lookup in the kernel path.
+ */
+internal object HostIpCacheSeeder {
+    private val seeded: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    fun seed(host: String) {
+        if (host.isNotEmpty() && seeded.add(host)) {
+            try {
+                val ips = InetAddress.getAllByName(host).mapNotNull { it.hostAddress }
+                if (ips.isNotEmpty()) NativeBridge.cacheHostIps(host, ips.toTypedArray())
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /**
+     * TEST-ONLY: clears the seeded host set so each test starts from a clean slate.
+     * Must not be called from production code.
+     */
+    fun resetForTest() { seeded.clear() }
+}

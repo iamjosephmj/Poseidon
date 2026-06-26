@@ -1,6 +1,10 @@
 package tech.ssemaj.poseidon.runtime
 
-/** Core-side seam. poseidon-native registers a real backend; default is no-op (Play-clean core). */
+/**
+ * Core-side seam for the native backend. poseidon-native registers a real [Backend];
+ * the default is no-op so the core AAR is Play-policy clean without native code.
+ */
+@InternalPoseidonApi
 object NativeBridge {
     interface Backend {
         fun apply(allowedHosts: List<String>, enforce: Boolean)

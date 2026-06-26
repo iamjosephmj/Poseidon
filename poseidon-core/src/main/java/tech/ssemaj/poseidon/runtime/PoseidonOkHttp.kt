@@ -1,3 +1,5 @@
+@file:OptIn(InternalPoseidonApi::class)
+
 package tech.ssemaj.poseidon.runtime
 
 import okhttp3.OkHttpClient
@@ -6,6 +8,7 @@ import okhttp3.OkHttpClient
  * Called from `OkHttpClient.Builder.build()` by the bytecode the Gradle plugin injects.
  * Idempotent: newBuilder() copies our interceptor into the new builder.
  */
+@InternalPoseidonApi
 object PoseidonOkHttp {
     @JvmStatic
     fun install(builder: OkHttpClient.Builder) {

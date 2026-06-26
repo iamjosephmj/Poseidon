@@ -9,7 +9,7 @@ class GlobVectorEquivalenceTest {
             .bufferedReader().readLines().filter { it.isNotBlank() && !it.startsWith("#") }
         for (line in vectors) {
             val (pattern, value, expect) = line.split("|")
-            val configured = PolicyEngine.matches(pattern, value)
+            val configured = Glob.matches(pattern, value)
             assertEquals("pattern=$pattern value=$value", expect == "1", configured)
         }
     }
