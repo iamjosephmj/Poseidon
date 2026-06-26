@@ -4,97 +4,537 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import tech.ssemaj.poseidon.probes.DemoProbes
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.Mode
+import tech.ssemaj.poseidon.runtime.model.Tier
+import tech.ssemaj.poseidon.ui.theme.AbyssalNavy
+import tech.ssemaj.poseidon.ui.theme.AquaAllow
+import tech.ssemaj.poseidon.ui.theme.BioluminescentTeal
+import tech.ssemaj.poseidon.ui.theme.CoralBlock
+import tech.ssemaj.poseidon.ui.theme.DeepBlue
+import tech.ssemaj.poseidon.ui.theme.MarineBlue
 import tech.ssemaj.poseidon.ui.theme.PoseidonTheme
+import tech.ssemaj.poseidon.ui.theme.TextPrimary
+import tech.ssemaj.poseidon.ui.theme.TextSecondary
+import tech.ssemaj.poseidon.ui.theme.TridentGold
 
 class MainActivity : ComponentActivity() {
+
+    private val dashboardState = EgressDashboardState()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Register Observer sink before the probes fire so no events are missed.
+        dashboardState.start()
         setContent {
-            PoseidonTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ProbeTierScreen(modifier = Modifier.padding(innerPadding))
+            PoseidonTheme(darkTheme = true) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = MaterialTheme.colorScheme.background,
+                ) { innerPadding ->
+                    PoseidonDashboard(
+                        state    = dashboardState,
+                        modifier = Modifier.padding(innerPadding),
+                    )
                 }
             }
         }
-        // Fire all demo probes after the UI is set up.
+        // Fire all demo probes after UI is set up (background threads; won't block UI).
         DemoProbes.runAll(applicationContext)
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        dashboardState.stop()
+    }
 }
 
-/**
- * Displays the three Poseidon interception tiers that the demo probes exercise.
- * Logcat tag "PoseidonDemo" shows live results for each probe.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Root screen
+// ─────────────────────────────────────────────────────────────────────────────
+
 @Composable
-fun ProbeTierScreen(modifier: Modifier = Modifier) {
-    Column(modifier = modifier.padding(16.dp)) {
+fun PoseidonDashboard(
+    state: EgressDashboardState,
+    modifier: Modifier = Modifier,
+) {
+    val listState = rememberLazyListState()
+
+    // Keep the newest event visible at the top as long as the user hasn't scrolled down.
+    LaunchedEffect(state.events.size) {
+        if (listState.firstVisibleItemIndex <= 2) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    LazyColumn(
+        state    = listState,
+        modifier = modifier.fillMaxSize(),
+    ) {
+        item(key = "header")     { PoseidonHeader() }
+        item(key = "tiers")      { TiersSection(state = state) }
+        item(key = "log_header") { LiveLogHeader(eventCount = state.events.size) }
+
+        if (state.events.isEmpty()) {
+            item(key = "empty") { EmptyLogPlaceholder() }
+        } else {
+            items(items = state.events, key = { it.id }) { logged ->
+                EgressLogRow(event = logged.event)
+            }
+        }
+
+        item(key = "footer") { LogFooter() }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Header — bioluminescent trident aura + wordmark + mode chip
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun PoseidonHeader() {
+    // Signature element: animated bioluminescent aura radiates from the trident.
+    // A security tool should feel alive — this is the deep-ocean heartbeat.
+    val infiniteTransition = rememberInfiniteTransition(label = "trident_aura")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue  = 0.22f,
+        targetValue   = 0.54f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(durationMillis = 2800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "glow_alpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(MarineBlue, AbyssalNavy),
+                    startY = 0f,
+                    endY   = 480f,
+                )
+            )
+            .padding(horizontal = 24.dp, vertical = 36.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // Trident glyph inside its animated aura
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier         = Modifier.size(128.dp),
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawTridentAura(glowAlpha)
+            }
+            Text(
+                text  = "🔱",   // 🔱  U+1F531 TRIDENT EMBLEM
+                style = MaterialTheme.typography.displayLarge.copy(fontSize = 54.sp),
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         Text(
-            text = "Poseidon Demo",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            text  = "POSEIDON",
+            style = MaterialTheme.typography.displayLarge,
+            color = TextPrimary,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+
+        Spacer(Modifier.height(6.dp))
+
         Text(
-            text = "Tier 1 — JVM adapters",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
+            text  = "Network egress gate for your SDKs",
+            style = MaterialTheme.typography.bodyLarge,
+            color = TextSecondary,
         )
+
+        Spacer(Modifier.height(20.dp))
+
+        ModeStatusChip()
+    }
+}
+
+/** Draws the deep-sea bioluminescent halo around the trident. */
+private fun DrawScope.drawTridentAura(alpha: Float) {
+    // Outer diffuse wash
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                BioluminescentTeal.copy(alpha = alpha * 0.30f),
+                BioluminescentTeal.copy(alpha = alpha * 0.08f),
+                Color.Transparent,
+            ),
+            center = center,
+            radius = size.minDimension / 2f,
+        ),
+    )
+    // Inner concentrated core glow
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(
+                BioluminescentTeal.copy(alpha = alpha * 0.75f),
+                Color.Transparent,
+            ),
+            center = center,
+            radius = size.minDimension / 5f,
+        ),
+    )
+}
+
+@Composable
+fun ModeStatusChip() {
+    val mode = Mode.current
+    val (label, chipColor) = if (mode == Mode.ENFORCE) {
+        "ENFORCE" to AquaAllow
+    } else {
+        "MONITOR" to TridentGold
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment     = Alignment.CenterVertically,
+    ) {
+        // Mode badge
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = chipColor.copy(alpha = 0.15f),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(chipColor)
+                )
+                Text(
+                    text  = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = chipColor,
+                )
+            }
+        }
+
         Text(
-            text = "OkHttp interceptor · HttpURLConnection call-site rewrite · " +
-                "Volley RequestQueue gate · Cronet Java API",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Tier 2 — native libc shim",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "ELF DT_NEEDED interposition via libposeidon_shim.so · " +
-                "covers Cronet native stack + any NDK HTTP client",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Tier 3 — seccomp Go-raw gate",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = "In-process seccomp USER_NOTIF supervisor · catches raw connect() / " +
-                "sendto() syscalls that bypass libc (Go runtime, raw-syscall callers) · " +
-                "DNS correlation maps IPs back to hostnames for policy enforcement",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "See Logcat tag: PoseidonDemo",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
+            text  = "1 host · 4 CIDRs",
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary,
         )
     }
 }
 
-@Preview(showBackground = true)
+// ─────────────────────────────────────────────────────────────────────────────
+// Tier cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+private data class TierMeta(
+    val tier: Tier,
+    val label: String,
+    val description: String,
+)
+
+private val TIER_META = listOf(
+    TierMeta(
+        tier        = Tier.JVM,
+        label       = "JVM ADAPTERS",
+        description = "OkHttp interceptor · HttpURLConnection rewrite · Volley gate · Cronet Java API",
+    ),
+    TierMeta(
+        tier        = Tier.NATIVE,
+        label       = "NATIVE LIBC",
+        description = "ELF DT_NEEDED interposition via libposeidon_shim.so · covers NDK + Cronet native",
+    ),
+    TierMeta(
+        tier        = Tier.SECCOMP,
+        label       = "SECCOMP GO/RAW",
+        description = "In-process USER_NOTIF supervisor · raw connect() / sendto() · DNS IP correlation",
+    ),
+)
+
 @Composable
-fun ProbeTierScreenPreview() {
-    PoseidonTheme {
-        ProbeTierScreen()
+fun TiersSection(state: EgressDashboardState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TIER_META.forEach { meta ->
+            TierCard(
+                meta  = meta,
+                allow = state.allowCount(meta.tier),
+                block = state.blockCount(meta.tier),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TierCard(meta: TierMeta, allow: Int, block: Int) {
+    Surface(
+        shape          = RoundedCornerShape(10.dp),
+        color          = DeepBlue,
+        tonalElevation = 2.dp,
+        modifier       = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+        ) {
+            // Left teal accent stripe
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(BioluminescentTeal.copy(alpha = 0.65f)),
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text  = meta.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = BioluminescentTeal,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text  = "↑ $allow",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AquaAllow,
+                        )
+                        Text(
+                            text  = "✕ $block",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CoralBlock,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text     = meta.description,
+                    style    = MaterialTheme.typography.bodyMedium,
+                    color    = TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live egress log
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Composable
+fun LiveLogHeader(eventCount: Int) {
+    // Pulsing indicator — alive as long as the audit stream is running
+    val infiniteTransition = rememberInfiniteTransition(label = "live_dot")
+    val dotAlpha by infiniteTransition.animateFloat(
+        initialValue  = 0.35f,
+        targetValue   = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation  = tween(durationMillis = 850, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "dot_alpha",
+    )
+
+    Column {
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(AquaAllow.copy(alpha = dotAlpha)),
+                )
+                Text(
+                    text  = "LIVE EGRESS LOG",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = TextPrimary,
+                )
+            }
+            if (eventCount > 0) {
+                Text(
+                    text  = "$eventCount",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                )
+            }
+        }
+        HorizontalDivider(color = MarineBlue, thickness = 1.dp)
+    }
+}
+
+@Composable
+fun EgressLogRow(event: EgressEvent) {
+    val isBlock      = event.decision?.block == true
+    val verdictColor = if (isBlock) CoralBlock else AquaAllow
+    val verdict      = if (isBlock) "BLOCK" else "ALLOW"
+    val tierLabel    = when (event.tier) {
+        Tier.JVM     -> "JVM    "
+        Tier.NATIVE  -> "NATIVE "
+        Tier.SECCOMP -> "SECCOMP"
+    }
+
+    val host    = event.host ?: event.ip ?: "?"
+    val path    = event.path.orEmpty()
+    val display = if (path.isNotEmpty()) "$host$path" else host
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+        ) {
+            // Verdict colour stripe — the fastest visual signal in the log
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(verdictColor.copy(alpha = 0.60f)),
+            )
+
+            Row(
+                modifier              = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text     = "[$tierLabel]",
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = BioluminescentTeal.copy(alpha = 0.65f),
+                    modifier = Modifier.width(80.dp),
+                )
+                Text(
+                    text     = display,
+                    style    = MaterialTheme.typography.bodySmall,
+                    color    = TextSecondary,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text  = verdict,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = verdictColor,
+                )
+            }
+        }
+        HorizontalDivider(
+            color     = MarineBlue.copy(alpha = 0.45f),
+            thickness = 0.5.dp,
+        )
+    }
+}
+
+@Composable
+fun EmptyLogPlaceholder() {
+    Box(
+        modifier         = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text  = "Awaiting egress events…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary.copy(alpha = 0.55f),
+        )
+    }
+}
+
+@Composable
+fun LogFooter() {
+    Text(
+        text     = "Decisions also stream to Logcat · tag: Poseidon",
+        style    = MaterialTheme.typography.bodySmall,
+        color    = TextSecondary.copy(alpha = 0.45f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 20.dp),
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Preview
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Preview(showBackground = true, backgroundColor = 0xFF050D18, widthDp = 380, heightDp = 780)
+@Composable
+fun PoseidonDashboardPreview() {
+    PoseidonTheme(darkTheme = true) {
+        PoseidonDashboard(state = EgressDashboardState())
     }
 }
