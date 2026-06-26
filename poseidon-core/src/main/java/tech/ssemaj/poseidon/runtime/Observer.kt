@@ -1,20 +1,51 @@
 package tech.ssemaj.poseidon.runtime
 
 import android.util.Log
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * The only audit output. Records every decision in BOTH modes (monitor = enforce minus
- * the block). Default sink logs off the JVM path; apps can swap a callback. The NATIVE
- * shim must NOT log on its hot path — native events arrive here via the async ring
- * (Phase 5), already off-thread.
+ * Pattern: **Observer** — the audit subject. Every policy decision is published here in
+ * BOTH modes (monitor = enforce minus the block); registered observers (sinks) receive
+ * a normalized [EgressEvent]. Native events arrive via the async ring drain (already
+ * off the shim's hot path), JVM events inline.
+ *
+ * Supports multiple observers: the default logs to Logcat; apps can [addSink] their own
+ * (metrics, a UI, a file) without removing others, [setSink] to replace all with one, or
+ * [resetSink] to restore just the default. A misbehaving observer can never break
+ * enforcement — each is dispatched under its own try/catch, and the list is copy-on-write
+ * so [record] never blocks on registration.
  */
 object Observer {
-    @Volatile private var sink: (EgressEvent) -> Unit = ::logSink
+    private val sinks = CopyOnWriteArrayList<(EgressEvent) -> Unit>().apply { add(::logSink) }
 
-    @JvmStatic fun record(event: EgressEvent) = sink(event)
+    /** Publish [event] to every registered observer. Never throws. */
+    @JvmStatic fun record(event: EgressEvent) {
+        for (sink in sinks) {
+            try {
+                sink(event)
+            } catch (_: Throwable) {
+                // An observer must never break the audit fan-out (or, in enforce, a block).
+            }
+        }
+    }
 
-    @JvmStatic fun setSink(sink: (EgressEvent) -> Unit) { this.sink = sink }
-    @JvmStatic fun resetSink() { this.sink = ::logSink }
+    /** Register an additional observer without removing existing ones. */
+    @JvmStatic fun addSink(sink: (EgressEvent) -> Unit) { sinks.add(sink) }
+
+    /** Remove a previously-registered observer (by identity — pass the same reference). */
+    @JvmStatic fun removeSink(sink: (EgressEvent) -> Unit) { sinks.remove(sink) }
+
+    /** Replace ALL observers with [sink] (single-sink convenience / back-compat). */
+    @JvmStatic fun setSink(sink: (EgressEvent) -> Unit) {
+        sinks.clear()
+        sinks.add(sink)
+    }
+
+    /** Restore the default Logcat observer (drops any app-registered sinks). */
+    @JvmStatic fun resetSink() {
+        sinks.clear()
+        sinks.add(::logSink)
+    }
 
     private fun logSink(e: EgressEvent) {
         val d = e.decision
