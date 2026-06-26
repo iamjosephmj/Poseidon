@@ -1,7 +1,16 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(poseidon_shim C)
 
-add_library(poseidon_shim SHARED shim.c event_ring.c)
+# shim.c has been split into focused translation units; all are compiled into
+# the same libposeidon_shim.so so symbol visibility is unchanged.
+add_library(poseidon_shim SHARED
+    policy_eval.c
+    dns_cache.c
+    interpose.c
+    seccomp_supervisor.c
+    jni_bridge.c
+    event_ring.c
+)
 
 # Export connect/sendto/… at version node LIBC so they satisfy SDKs' versioned
 # imports (e.g. Cronet's connect@LIBC).

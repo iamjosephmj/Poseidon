@@ -31,7 +31,6 @@
  *       ring_drain makes the new tail visible to producers' acquire-load of
  *       g_tail in their full-check.
  *
- * RUNTIME / CONCURRENCY UNVERIFIED — deferred to Checkpoint 5 (on-device).
  */
 #include "event_ring.h"
 #include <string.h>

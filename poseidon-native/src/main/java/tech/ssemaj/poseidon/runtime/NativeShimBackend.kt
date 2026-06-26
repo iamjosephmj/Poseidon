@@ -10,10 +10,10 @@ import android.util.Log
  * Package intentionally matches :poseidon-core's package so JNI symbol names
  * (Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_*) bind correctly.
  *
- * Task 5.1 adds a daemon drain thread that polls [drainEvents] every ~250 ms
- * and forwards each drained native event to [Observer.record], keeping the
- * native hot path (connect/sendto/getaddrinfo) completely free of synchronous
- * logging or JNI calls.
+ * The daemon drain thread polls [drainEvents] every ~250 ms and forwards each
+ * drained native event to [Observer.record] via [RingEventParser], keeping the
+ * native hot path (connect/sendto/getaddrinfo) free of synchronous logging or
+ * JNI calls.
  */
 object NativeShimBackend : NativeBridge.Backend {
 
@@ -33,6 +33,9 @@ object NativeShimBackend : NativeBridge.Backend {
     }
 
     // ---- JNI externals (10 symbols) ----
+    // configureCidrs is included in this count.  All names are pinned by the
+    // version script (poseidon.ver) and the FQN Java_tech_ssemaj_poseidon_runtime_
+    // NativeShimBackend_* prefix required by the JNI spec.
 
     /** Pushes the host allow-list + mode into native. */
     private external fun configure(allowedHosts: Array<String>, enforce: Int)
@@ -61,14 +64,7 @@ object NativeShimBackend : NativeBridge.Backend {
     /**
      * Drains up to 64 pending events from the native lock-free ring.
      * Each element is a compact string: "ts|host|port|transport|tier|blocked|origin_addr"
-     * where:
-     *   ts          = CLOCK_MONOTONIC nanoseconds (or 0)
-     *   host        = hostname or IP (up to 63 chars)
-     *   port        = destination port
-     *   transport   = 0 (TCP/unknown), 1 (UDP), 2 (DNS)
-     *   tier        = 0 (libc-interceptor), 1 (seccomp-supervisor)
-     *   blocked     = 0 (allowed/monitor) or 1 (blocked)
-     *   origin_addr = return-address into the calling SDK .so
+     * Parsed by [RingEventParser]. See event_ring.h for field encodings.
      */
     private external fun drainEvents(): Array<String>
 
@@ -133,16 +129,14 @@ object NativeShimBackend : NativeBridge.Backend {
         }
     }
 
-    // ---- Task 5.1: daemon drain thread ----
+    // ---- Daemon drain thread ----
 
     /**
      * Starts a single daemon thread that polls [drainEvents] every ~250 ms
-     * and forwards each event to [Observer.record].
+     * and forwards each event to [Observer.record] via [RingEventParser].
      *
      * The thread is a daemon so it never prevents JVM shutdown.
      * All exceptions inside the loop are swallowed to prevent crashing the app.
-     *
-     * RUNTIME CORRECTNESS UNVERIFIED — deferred to Checkpoint 5 (no device).
      */
     private fun startDrainThread() {
         val thread = Thread({
@@ -152,69 +146,21 @@ object NativeShimBackend : NativeBridge.Backend {
                     val events = drainEvents()
                     for (raw in events) {
                         try {
-                            val event = parseRingEvent(raw) ?: continue
+                            val event = RingEventParser.parse(raw) { symbolize(it) } ?: continue
                             Observer.record(event)
-                        } catch (t: Throwable) {
+                        } catch (_: Throwable) {
                             // Never let a single bad event crash the drain loop.
                         }
                     }
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt()
                     break
-                } catch (t: Throwable) {
+                } catch (_: Throwable) {
                     // Never crash the drain thread on unexpected errors.
                 }
             }
         }, "poseidon-native-drain")
         thread.isDaemon = true
         thread.start()
-    }
-
-    /**
-     * Parses a compact ring-event string into an [EgressEvent].
-     *
-     * Format: "ts|host|port|transport|tier|blocked|origin_addr"
-     *   transport: 0=TCP/unknown, 1=UDP, 2=DNS
-     *   tier:      0=libc (Tier.NATIVE), 1=seccomp (Tier.SECCOMP)
-     *   blocked:   0=ALLOW, 1=BLOCK
-     *
-     * Returns null if the string cannot be parsed.
-     */
-    private fun parseRingEvent(raw: String): EgressEvent? {
-        val parts = raw.split('|')
-        if (parts.size != 7) return null
-        val ts        = parts[0].toLongOrNull() ?: return null
-        val host      = parts[1].ifEmpty { null }
-        val port      = parts[2].toIntOrNull() ?: 0
-        val transport = parts[3].toIntOrNull() ?: 0
-        val tierInt   = parts[4].toIntOrNull() ?: 0
-        val blocked   = (parts[5].toIntOrNull() ?: 0) != 0
-        val originAddr = parts[6].toULongOrNull()?.toLong() ?: 0L
-
-        val transportEnum = when (transport) {
-            1    -> Transport.UDP
-            2    -> Transport.DNS
-            else -> Transport.TCP
-        }
-        val tierEnum = if (tierInt == 1) Tier.SECCOMP else Tier.NATIVE
-        val action = if (blocked) Action.BLOCK else Action.ALLOW
-        val decision = Decision(action = action, reason = if (blocked) "native-block" else "")
-
-        // Symbolize the origin address off the hot path (dladdr, safe to call here).
-        val originSymbol: String? = if (originAddr != 0L) {
-            try { symbolize(originAddr) } catch (_: Throwable) { null }
-        } else null
-
-        return EgressEvent(
-            ts          = ts,
-            tid         = 0,   // native thread id not captured; use 0
-            host        = host,
-            ip          = null, // IP is embedded in host field from native side
-            port        = port,
-            transport   = transportEnum,
-            tier        = tierEnum,
-            originToken = originSymbol ?: originAddr,
-            decision    = decision,
-        )
     }
 }

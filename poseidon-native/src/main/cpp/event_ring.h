@@ -16,9 +16,6 @@
  * Drop-on-full:
  *   If head - tail >= RING_CAP the CAS loop increments g_dropped and returns
  *   without claiming or writing any slot, so the consumer never stalls.
- *
- * RUNTIME / CONCURRENCY UNVERIFIED — deferred to Checkpoint 5.
- * No host toolchain is available to run ring_test; no device is connected.
  */
 #pragma once
 #include <stdint.h>
@@ -26,17 +23,41 @@
 #define RING_CAP  1024              /* fixed capacity; MUST be a power of two */
 #define RING_MASK ((unsigned)(RING_CAP) - 1u)
 
+/* ---- Named wire constants ----
+ * Used at ring_push call sites instead of bare integer literals.
+ * The Kotlin drain thread parses the pipe-delimited wire format:
+ *   ts|host|port|transport|tier|blocked|origin_addr
+ * where transport and tier use the values below.
+ * See NativeShimBackend.RingEventParser for the Kotlin side. */
+#define POSEIDON_TRANSPORT_TCP  0   /* TCP or unknown socket type    */
+#define POSEIDON_TRANSPORT_UDP  1   /* connectionless UDP            */
+#define POSEIDON_TRANSPORT_DNS  2   /* DNS query/block               */
+
+#define POSEIDON_TIER_LIBC      0   /* libc-interceptor (DT_NEEDED)  */
+#define POSEIDON_TIER_SECCOMP   1   /* seccomp USER_NOTIF supervisor */
+
 /* Plain-old-data payload carried through the ring.
  * All fields are written by the producer BEFORE the seq publish; the consumer
- * copies the struct as a unit after it sees seq == tail + 1.             */
+ * copies the struct as a unit after it sees seq == tail + 1.
+ *
+ * Wire format (pipe-delimited string produced by drainEvents JNI):
+ *   ts|host|port|transport|tier|blocked|origin_addr
+ *   ts          = CLOCK_MONOTONIC nanoseconds (uint64, or 0)
+ *   host        = hostname or IP literal (≤63 chars, NUL-terminated)
+ *   port        = destination port (0 if unknown)
+ *   transport   = POSEIDON_TRANSPORT_TCP/UDP/DNS
+ *   tier        = POSEIDON_TIER_LIBC/SECCOMP
+ *   blocked     = 1 if blocked, 0 if allowed or monitor-violation
+ *   origin_addr = dladdr()-resolvable return-address into calling SDK .so
+ */
 struct ring_event {
-    uint64_t ts;           /* CLOCK_MONOTONIC nanoseconds, or 0 if unavailable */
-    char     host[64];     /* hostname or IP literal; NUL-terminated; truncated */
-    int      port;         /* destination port (0 if unknown / DNS block)        */
-    int      transport;    /* 0=TCP/unknown  1=UDP  2=DNS                        */
-    int      tier;         /* 0=libc-interceptor  1=seccomp-supervisor           */
-    int      blocked;      /* 1=blocked  0=allowed or monitor-violation           */
-    uint64_t origin_addr;  /* dladdr()-resolvable return-address into caller .so  */
+    uint64_t ts;
+    char     host[64];
+    int      port;
+    int      transport;
+    int      tier;
+    int      blocked;
+    uint64_t origin_addr;
 };
 
 /* Push one event from ANY thread (multi-producer hot path).
