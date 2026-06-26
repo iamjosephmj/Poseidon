@@ -23,6 +23,8 @@ android {
 
     buildTypes {
         release {
+            // Demo APK: sign with the debug key so the attached release artifact is installable.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
                 enable = false
             }

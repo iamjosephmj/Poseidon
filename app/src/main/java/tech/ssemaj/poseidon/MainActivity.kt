@@ -23,7 +23,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -87,6 +93,8 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
+                    // Draw fully edge-to-edge; each section applies the insets it needs itself.
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 ) { innerPadding ->
                     PoseidonDashboard(
                         state    = dashboardState,
@@ -128,8 +136,12 @@ fun PoseidonDashboard(
     }
 
     LazyColumn(
-        state    = listState,
-        modifier = modifier.fillMaxSize(),
+        state          = listState,
+        modifier       = modifier.fillMaxSize(),
+        // Last items clear the gesture/navigation bar; the header handles the top inset.
+        contentPadding = PaddingValues(
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+        ),
     ) {
         item(key = "header")     { PoseidonHeader(policy) }
         item(key = "policy")     { PolicyCard(policy) }
@@ -178,6 +190,8 @@ fun PoseidonHeader(policy: PolicyInfo) {
                     endY   = 480f,
                 )
             )
+            // Gradient fills behind the status bar; the content below clears it.
+            .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 24.dp, vertical = 36.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
