@@ -31,12 +31,12 @@ android {
 dependencies {
     // Client types are referenced only by the injected adapters; compileOnly so they
     // are never forced into a consuming app that doesn't already use them.
-    compileOnly("com.squareup.okhttp3:okhttp:4.12.0")
-    compileOnly("com.android.volley:volley:1.2.1")
-    compileOnly("org.chromium.net:cronet-embedded:143.7445.0")
+    compileOnly(libs.okhttp)
+    compileOnly(libs.volley)
+    compileOnly(libs.cronet.embedded)
     // Auto-loads the compiled policy asset at process start.
-    implementation("androidx.startup:startup-runtime:1.1.1")
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.robolectric:robolectric:4.13")
-    testImplementation("androidx.test:core:1.6.1")
+    implementation(libs.androidx.startup.runtime)
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
