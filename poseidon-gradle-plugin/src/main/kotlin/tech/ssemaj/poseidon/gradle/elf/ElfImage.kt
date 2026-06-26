@@ -16,6 +16,9 @@ internal const val DT_STRSZ    = 10L
 internal const val SHT_STRTAB  = 3
 internal const val SHT_DYNAMIC = 6
 
+/** Reads a 32-bit field at [off] and zero-extends it to Long (unsigned). */
+internal fun ByteBuffer.getULong(off: Int): Long = getInt(off).toLong() and 0xffffffffL
+
 /**
  * Parses and holds the structural view of an ELF32/64 little-endian file needed for
  * DT_NEEDED injection. Exposes geometry helpers used by the named injection phases.
@@ -39,8 +42,8 @@ internal class ElfImage(val file: File, val b: ByteArray) {
     val shnumOff: Int = if (is64) 60 else 48
 
     // Header values.
-    val ePhoff:    Long = if (is64) bb.getLong(32) else bb.getInt(28).toLong() and 0xffffffffL
-    val eShoff:    Long = if (is64) bb.getLong(40) else bb.getInt(32).toLong() and 0xffffffffL
+    val ePhoff:    Long = if (is64) bb.getLong(32) else bb.getULong(28)
+    val eShoff:    Long = if (is64) bb.getLong(40) else bb.getULong(32)
     val phEntSize: Int  = bb.getShort(phentOff).toInt() and 0xffff
     val phNum:     Int  = bb.getShort(phnumOff).toInt() and 0xffff
     val shEntSize: Int  = bb.getShort(shentOff).toInt() and 0xffff
@@ -51,6 +54,9 @@ internal class ElfImage(val file: File, val b: ByteArray) {
     val dynPh: Ph       = phs.firstOrNull { it.type == PT_DYNAMIC }
         ?: error("no PT_DYNAMIC in ${file.name}")
     val loads: List<Ph> = phs.filter { it.type == PT_LOAD }
+
+    /** Reads an ELF-word at [off]: 64-bit signed on ELF64, 32-bit zero-extended on ELF32. */
+    private fun readWord(off: Int): Long = if (is64) bb.getLong(off) else bb.getULong(off)
 
     // Dynamic section.
     val dynEntSize: Int = if (is64) 16 else 8
@@ -67,8 +73,8 @@ internal class ElfImage(val file: File, val b: ByteArray) {
         var o   = dynPh.off.toInt()
         val end = (dynPh.off + dynPh.filesz).toInt()
         while (o + dynEntSize <= end) {
-            val tag = if (is64) bb.getLong(o) else bb.getInt(o).toLong() and 0xffffffffL
-            val v   = if (is64) bb.getLong(o + 8) else bb.getInt(o + 4).toLong() and 0xffffffffL
+            val tag = readWord(o)
+            val v   = readWord(o + if (is64) 8 else 4)
             dynList.add(Dyn(tag, v))
             if (tag == DT_NULL) break
             o += dynEntSize
@@ -83,14 +89,14 @@ internal class ElfImage(val file: File, val b: ByteArray) {
     fun readPh(i: Int): Ph {
         val o = (ePhoff + i.toLong() * phEntSize).toInt()
         return if (is64) Ph(
-            i, bb.getInt(o), bb.getInt(o + 4).toLong() and 0xffffffffL,
+            i, bb.getInt(o), bb.getULong(o + 4),
             bb.getLong(o + 8), bb.getLong(o + 16), bb.getLong(o + 24),
             bb.getLong(o + 32), bb.getLong(o + 40), bb.getLong(o + 48),
         ) else Ph(
-            i, bb.getInt(o), bb.getInt(o + 24).toLong() and 0xffffffffL,
-            bb.getInt(o + 4).toLong() and 0xffffffffL, bb.getInt(o + 8).toLong() and 0xffffffffL,
-            bb.getInt(o + 12).toLong() and 0xffffffffL, bb.getInt(o + 16).toLong() and 0xffffffffL,
-            bb.getInt(o + 20).toLong() and 0xffffffffL, bb.getInt(o + 28).toLong() and 0xffffffffL,
+            i, bb.getInt(o), bb.getULong(o + 24),
+            bb.getULong(o + 4), bb.getULong(o + 8),
+            bb.getULong(o + 12), bb.getULong(o + 16),
+            bb.getULong(o + 20), bb.getULong(o + 28),
         )
     }
 
@@ -100,8 +106,7 @@ internal class ElfImage(val file: File, val b: ByteArray) {
     }
 
     fun cstr(buf: ByteArray, off: Int): String {
-        var e = off
-        while (e < buf.size && buf[e].toInt() != 0) e++
-        return String(buf, off, e - off, Charsets.US_ASCII)
+        val end = (off until buf.size).firstOrNull { buf[it].toInt() == 0 } ?: buf.size
+        return String(buf, off, end - off, Charsets.US_ASCII)
     }
 }

@@ -20,9 +20,9 @@ object YamlPolicyOverlay {
         var result = base
 
         // YAML allowedHosts → union into dslHosts (passed by reference)
-        (yaml["allowedHosts"] as? List<*>)?.filterIsInstance<String>()?.forEach { host ->
-            if (host !in dslHosts) dslHosts.add(host)
-        }
+        (yaml["allowedHosts"] as? List<*>)?.filterIsInstance<String>()
+            ?.filterNot { it in dslHosts }
+            ?.let { dslHosts.addAll(it) }
         // YAML deniedPaths → union into result
         val yamlDenied = (yaml["deniedPaths"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
         if (yamlDenied.isNotEmpty()) {

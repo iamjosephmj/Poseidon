@@ -80,17 +80,18 @@ object ElfDtNeededInjector {
         val offDyn       = up(offDynstr + newStrtab.size, 8)
 
         // new .dynamic: our DT_NEEDED first, old entries (sans DT_NULL, strtab updated), DT_NULL
-        val newDyns = ArrayList<ElfImage.Dyn>()
-        newDyns.add(ElfImage.Dyn(DT_NEEDED, newStrOffset))
-        for (d in image.dyns) {
-            if (d.tag == DT_NULL) continue
-            when (d.tag) {
-                DT_STRTAB -> newDyns.add(ElfImage.Dyn(DT_STRTAB, regionVaddr + offDynstr))
-                DT_STRSZ  -> newDyns.add(ElfImage.Dyn(DT_STRSZ, newStrtab.size.toLong()))
-                else       -> newDyns.add(ElfImage.Dyn(d.tag, d.v))
+        val newDyns = buildList {
+            add(ElfImage.Dyn(DT_NEEDED, newStrOffset))
+            for (d in image.dyns) {
+                if (d.tag == DT_NULL) continue
+                add(when (d.tag) {
+                    DT_STRTAB -> ElfImage.Dyn(DT_STRTAB, regionVaddr + offDynstr)
+                    DT_STRSZ  -> ElfImage.Dyn(DT_STRSZ, newStrtab.size.toLong())
+                    else      -> d
+                })
             }
+            add(ElfImage.Dyn(DT_NULL, 0))
         }
-        newDyns.add(ElfImage.Dyn(DT_NULL, 0))
         val newDynSize  = newDyns.size.toLong() * image.dynEntSize
         val regionSize  = offDyn + newDynSize
 
@@ -176,7 +177,7 @@ object ElfDtNeededInjector {
                         bb.putInt(so + 20, data.newDynSize.toInt())
                     }
                     SHT_STRTAB -> {
-                        val shAddr = if (is64) bb.getLong(so + 16) else bb.getInt(so + 12).toLong() and 0xffffffffL
+                        val shAddr = if (is64) bb.getLong(so + 16) else bb.getULong(so + 12)
                         if (shAddr == data.origStrtabVaddr) {
                             if (is64) {
                                 bb.putLong(so + 16, data.regionVaddr + data.offDynstr)

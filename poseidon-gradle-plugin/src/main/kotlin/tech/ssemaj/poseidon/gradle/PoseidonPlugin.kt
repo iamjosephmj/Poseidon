@@ -23,7 +23,7 @@ class PoseidonPlugin : Plugin<Project> {
             ?: error("Poseidon must be applied after an Android application/library plugin")
 
         components.onVariants { variant ->
-            val capitalizedVariant = variant.name.replaceFirstChar { c -> c.uppercase() }
+            val capitalizedVariant = variant.name.replaceFirstChar { it.uppercase() }
             val policyYamlPath = ext.policyFile
             val mergedManifestProvider = variant.artifacts.get(SingleArtifact.MERGED_MANIFEST)
 
