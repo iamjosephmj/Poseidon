@@ -85,9 +85,9 @@ dependencyResolutionManagement {
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.0")  // full umbrella
+    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.1")  // full umbrella
     // …or just the Play-clean JVM core:
-    // implementation("com.github.iamjosephmj.Poseidon:poseidon-core:0.1.0")
+    // implementation("com.github.iamjosephmj.Poseidon:poseidon-core:0.1.1")
 }
 ```
 
@@ -107,7 +107,7 @@ export JAVA_HOME=/path/to/jbr            # JDK 17 (Android Studio's bundled JBR 
 // app/build.gradle.kts
 plugins {
     id("com.android.application")
-    id("tech.ssemaj.poseidon") version "0.1.0"   // resolved from mavenLocal
+    id("tech.ssemaj.poseidon") version "0.1.1"   // resolved from mavenLocal
 }
 ```
 
