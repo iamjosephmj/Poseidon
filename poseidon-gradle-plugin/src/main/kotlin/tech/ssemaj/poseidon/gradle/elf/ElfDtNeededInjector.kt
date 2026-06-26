@@ -35,10 +35,15 @@ object ElfDtNeededInjector {
 
     private fun validateElf(b: ByteArray, file: File) {
         require(
-            b.size > 64 && b[0] == 0x7f.toByte() && b[1] == 'E'.code.toByte() &&
-                b[2] == 'L'.code.toByte() && b[3] == 'F'.code.toByte()
+            b.size > ElfIdent.MIN_SIZE &&
+                b[ElfIdent.MAG0_OFF].toInt() == ElfIdent.MAG0 &&
+                b[ElfIdent.MAG1_OFF].toInt() == ElfIdent.MAG1 &&
+                b[ElfIdent.MAG2_OFF].toInt() == ElfIdent.MAG2 &&
+                b[ElfIdent.MAG3_OFF].toInt() == ElfIdent.MAG3
         ) { "not an ELF: ${file.name}" }
-        require(b[5].toInt() == 1) { "big-endian ELF unsupported: ${file.name}" }
+        require(b[ElfIdent.DATA_OFF].toInt() == ElfIdent.DATA_LSB) {
+            "big-endian ELF unsupported: ${file.name}"
+        }
     }
 
     private fun readHeaders(file: File, bytes: ByteArray): ElfImage = ElfImage(file, bytes)
@@ -64,7 +69,7 @@ object ElfDtNeededInjector {
     )
 
     private fun buildAppendedRegion(image: ElfImage, soname: String): RegionData {
-        val align = (image.loads.maxOf { it.align }.takeIf { it > 1 } ?: 0x1000L)
+        val align = (image.loads.maxOf { it.align }.takeIf { it > 1 } ?: DEFAULT_PAGE_ALIGN)
         fun up(x: Long, a: Long) = (x + a - 1) / a * a
         val regionOff   = up(image.b.size.toLong(), align)
         val maxVEnd     = image.loads.maxOf { it.vaddr + it.memsz }
@@ -122,24 +127,35 @@ object ElfDtNeededInjector {
         updatedPhs.forEachIndexed { i, p ->
             val o = (offPhdr + i.toLong() * image.phEntSize).toInt()
             if (image.is64) {
-                rb.putInt(o, p.type); rb.putInt(o + 4, p.flags.toInt())
-                rb.putLong(o + 8, p.off); rb.putLong(o + 16, p.vaddr); rb.putLong(o + 24, p.paddr)
-                rb.putLong(o + 32, p.filesz); rb.putLong(o + 40, p.memsz); rb.putLong(o + 48, p.align)
+                rb.putInt(o + ElfPhdrOff.TYPE_64,   p.type)
+                rb.putInt(o + ElfPhdrOff.FLAGS_64,  p.flags.toInt())
+                rb.putLong(o + ElfPhdrOff.OFFSET_64, p.off)
+                rb.putLong(o + ElfPhdrOff.VADDR_64,  p.vaddr)
+                rb.putLong(o + ElfPhdrOff.PADDR_64,  p.paddr)
+                rb.putLong(o + ElfPhdrOff.FILESZ_64, p.filesz)
+                rb.putLong(o + ElfPhdrOff.MEMSZ_64,  p.memsz)
+                rb.putLong(o + ElfPhdrOff.ALIGN_64,  p.align)
             } else {
-                rb.putInt(o, p.type); rb.putInt(o + 4, p.off.toInt()); rb.putInt(o + 8, p.vaddr.toInt())
-                rb.putInt(o + 12, p.paddr.toInt()); rb.putInt(o + 16, p.filesz.toInt())
-                rb.putInt(o + 20, p.memsz.toInt()); rb.putInt(o + 24, p.flags.toInt())
-                rb.putInt(o + 28, p.align.toInt())
+                rb.putInt(o + ElfPhdrOff.TYPE_32,   p.type)
+                rb.putInt(o + ElfPhdrOff.OFFSET_32, p.off.toInt())
+                rb.putInt(o + ElfPhdrOff.VADDR_32,  p.vaddr.toInt())
+                rb.putInt(o + ElfPhdrOff.PADDR_32,  p.paddr.toInt())
+                rb.putInt(o + ElfPhdrOff.FILESZ_32, p.filesz.toInt())
+                rb.putInt(o + ElfPhdrOff.MEMSZ_32,  p.memsz.toInt())
+                rb.putInt(o + ElfPhdrOff.FLAGS_32,  p.flags.toInt())
+                rb.putInt(o + ElfPhdrOff.ALIGN_32,  p.align.toInt())
             }
         }
 
         // dynstr
         System.arraycopy(newStrtab, 0, region, offDynstr.toInt(), newStrtab.size)
         // dynamic
+        val dValOff64 = ElfDynEnt.D_VAL_64
+        val dValOff32 = ElfDynEnt.D_VAL_32
         newDyns.forEachIndexed { i, d ->
             val o = (offDyn + i.toLong() * image.dynEntSize).toInt()
-            if (image.is64) { rb.putLong(o, d.tag); rb.putLong(o + 8, d.v) }
-            else { rb.putInt(o, d.tag.toInt()); rb.putInt(o + 4, d.v.toInt()) }
+            if (image.is64) { rb.putLong(o, d.tag); rb.putLong(o + dValOff64, d.v) }
+            else { rb.putInt(o, d.tag.toInt()); rb.putInt(o + dValOff32, d.v.toInt()) }
         }
 
         return RegionData(
@@ -156,37 +172,38 @@ object ElfDtNeededInjector {
         val bb   = image.bb
         val is64 = image.is64
 
-        // Update e_phoff and e_phnum.
-        if (is64) bb.putLong(32, data.regionOff + data.offPhdr)
-        else       bb.putInt(28, (data.regionOff + data.offPhdr).toInt())
+        // Update e_phoff (program-header table offset) and e_phnum.
+        if (is64) bb.putLong(ElfHeaderOff.E_PHOFF_64, data.regionOff + data.offPhdr)
+        else       bb.putInt(ElfHeaderOff.E_PHOFF_32, (data.regionOff + data.offPhdr).toInt())
         bb.putShort(image.phnumOff, data.newPhNum.toShort())
 
         // Repoint .dynamic / .dynstr section headers so tooling agrees with the loader.
         if (image.eShoff != 0L && image.shNum > 0) {
             for (i in 0 until image.shNum) {
                 val so     = (image.eShoff + i.toLong() * image.shEntSize).toInt()
-                val shType = bb.getInt(so + 4)
+                val shType = bb.getInt(so + ElfShdrOff.SH_TYPE)
                 when (shType) {
                     SHT_DYNAMIC -> if (is64) {
-                        bb.putLong(so + 16, data.regionVaddr + data.offDyn)
-                        bb.putLong(so + 24, data.regionOff  + data.offDyn)
-                        bb.putLong(so + 32, data.newDynSize)
+                        bb.putLong(so + ElfShdrOff.SH_ADDR_64,   data.regionVaddr + data.offDyn)
+                        bb.putLong(so + ElfShdrOff.SH_OFFSET_64, data.regionOff   + data.offDyn)
+                        bb.putLong(so + ElfShdrOff.SH_SIZE_64,   data.newDynSize)
                     } else {
-                        bb.putInt(so + 12, (data.regionVaddr + data.offDyn).toInt())
-                        bb.putInt(so + 16, (data.regionOff   + data.offDyn).toInt())
-                        bb.putInt(so + 20, data.newDynSize.toInt())
+                        bb.putInt(so + ElfShdrOff.SH_ADDR_32,   (data.regionVaddr + data.offDyn).toInt())
+                        bb.putInt(so + ElfShdrOff.SH_OFFSET_32, (data.regionOff   + data.offDyn).toInt())
+                        bb.putInt(so + ElfShdrOff.SH_SIZE_32,   data.newDynSize.toInt())
                     }
                     SHT_STRTAB -> {
-                        val shAddr = if (is64) bb.getLong(so + 16) else bb.getULong(so + 12)
+                        val shAddr = if (is64) bb.getLong(so + ElfShdrOff.SH_ADDR_64)
+                                     else      bb.getULong(so + ElfShdrOff.SH_ADDR_32)
                         if (shAddr == data.origStrtabVaddr) {
                             if (is64) {
-                                bb.putLong(so + 16, data.regionVaddr + data.offDynstr)
-                                bb.putLong(so + 24, data.regionOff   + data.offDynstr)
-                                bb.putLong(so + 32, data.newStrtabSize.toLong())
+                                bb.putLong(so + ElfShdrOff.SH_ADDR_64,   data.regionVaddr + data.offDynstr)
+                                bb.putLong(so + ElfShdrOff.SH_OFFSET_64, data.regionOff   + data.offDynstr)
+                                bb.putLong(so + ElfShdrOff.SH_SIZE_64,   data.newStrtabSize.toLong())
                             } else {
-                                bb.putInt(so + 12, (data.regionVaddr + data.offDynstr).toInt())
-                                bb.putInt(so + 16, (data.regionOff   + data.offDynstr).toInt())
-                                bb.putInt(so + 20, data.newStrtabSize)
+                                bb.putInt(so + ElfShdrOff.SH_ADDR_32,   (data.regionVaddr + data.offDynstr).toInt())
+                                bb.putInt(so + ElfShdrOff.SH_OFFSET_32, (data.regionOff   + data.offDynstr).toInt())
+                                bb.putInt(so + ElfShdrOff.SH_SIZE_32,   data.newStrtabSize)
                             }
                         }
                     }

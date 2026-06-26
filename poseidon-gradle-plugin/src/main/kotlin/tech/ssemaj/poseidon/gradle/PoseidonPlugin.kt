@@ -10,6 +10,36 @@ import tech.ssemaj.poseidon.gradle.elf.PoseidonNativeInjectTask
 import tech.ssemaj.poseidon.gradle.policy.GeneratePolicyTask
 import tech.ssemaj.poseidon.gradle.transform.PoseidonClassVisitorFactory
 
+// ---------------------------------------------------------------------------
+// Task name prefixes — one task per variant is registered as "<prefix><Variant>".
+// ---------------------------------------------------------------------------
+/** Prefix for the per-variant policy-generation task (e.g. generatePoseidonPolicyDebug). */
+private const val TASK_GENERATE_POLICY = "generatePoseidonPolicy"
+/** Prefix for the per-variant native ELF injection task (e.g. poseidonInjectNativeDebug). */
+private const val TASK_INJECT_NATIVE   = "poseidonInjectNative"
+
+// ---------------------------------------------------------------------------
+// AGP task name fragments — used to locate AGP-internal tasks by name pattern.
+// The actual string values must stay identical so task-graph wiring resolves correctly.
+// ---------------------------------------------------------------------------
+/** AGP strip-task prefix: task name is "<prefix><Variant><suffix>" (e.g. stripDebugDebugSymbols). */
+private const val AGP_STRIP_PREFIX      = "strip"
+/** AGP strip-task suffix: appended after the capitalised variant name. */
+private const val AGP_STRIP_SUFFIX      = "DebugSymbols"
+/** AGP APK packager task prefix: task name is "<prefix><Variant>" (e.g. packageDebug). */
+private const val AGP_PACKAGE_PREFIX    = "package"
+/** AGP AAB pre-bundle task prefix: task name is "<prefix><Variant><suffix>" (e.g. buildDebugPreBundle). */
+private const val AGP_PRE_BUNDLE_PREFIX = "build"
+/** AGP AAB pre-bundle task suffix: appended after the capitalised variant name. */
+private const val AGP_PRE_BUNDLE_SUFFIX = "PreBundle"
+
+// ---------------------------------------------------------------------------
+// AGP intermediates path — the directory where AGP places stripped native libs
+// between the strip task and the package task.
+// ---------------------------------------------------------------------------
+/** Relative path (from build dir) to the stripped native libs intermediates directory. */
+private const val AGP_STRIPPED_LIBS_PATH = "intermediates/stripped_native_libs/"
+
 /**
  * Applies after the Android application/library plugin. For now wires the OkHttp
  * path-interceptor bytecode transform. Later: native ELF interposition over merged
@@ -29,7 +59,7 @@ class PoseidonPlugin : Plugin<Project> {
 
             // Compiled policy (DSL + optional YAML) -> generated asset, loaded at startup.
             val genTask = project.tasks.register(
-                "generatePoseidonPolicy$capitalizedVariant", GeneratePolicyTask::class.java,
+                "$TASK_GENERATE_POLICY$capitalizedVariant", GeneratePolicyTask::class.java,
             )
             genTask.configure {
                 allowedHosts.set(ext.allowedHosts.toList())
@@ -65,20 +95,21 @@ class PoseidonPlugin : Plugin<Project> {
 
     private fun registerNativeInjection(project: Project, capitalizedVariant: String, variantName: String) {
         val inject = project.tasks.register(
-            "poseidonInjectNative$capitalizedVariant", PoseidonNativeInjectTask::class.java,
+            "$TASK_INJECT_NATIVE$capitalizedVariant", PoseidonNativeInjectTask::class.java,
         )
         inject.configure {
             strippedDir.set(
-                project.layout.buildDirectory.dir("intermediates/stripped_native_libs/$variantName"),
+                project.layout.buildDirectory.dir("$AGP_STRIPPED_LIBS_PATH$variantName"),
             )
             // Ordering only (lenient: ignored if the task name differs/absent),
             // so we don't force creation of AGP's strip task.
-            mustRunAfter("strip${capitalizedVariant}DebugSymbols")
+            mustRunAfter("$AGP_STRIP_PREFIX$capitalizedVariant$AGP_STRIP_SUFFIX")
         }
         // Both the APK packager and the AAB pre-bundle consume the (now-injected)
         // stripped libs; AGP signs each normally afterward (no re-sign).
         project.tasks.configureEach {
-            if (name == "package$capitalizedVariant" || name == "build${capitalizedVariant}PreBundle") {
+            if (name == "$AGP_PACKAGE_PREFIX$capitalizedVariant" ||
+                name == "$AGP_PRE_BUNDLE_PREFIX$capitalizedVariant$AGP_PRE_BUNDLE_SUFFIX") {
                 dependsOn(inject)
             }
         }

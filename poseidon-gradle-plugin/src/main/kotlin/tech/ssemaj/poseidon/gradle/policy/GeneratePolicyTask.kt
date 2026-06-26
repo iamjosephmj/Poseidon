@@ -15,6 +15,17 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 import java.io.File
 
+// ---------------------------------------------------------------------------
+// Asset output paths — these values are read verbatim by the runtime at
+// startup and MUST NOT be changed without a matching runtime update.
+// ---------------------------------------------------------------------------
+/** Subdirectory (inside the generated assets dir) that holds all Poseidon outputs. */
+private const val POLICY_ASSET_SUBDIR   = "poseidon"
+/** Filename of the compiled policy JSON asset; loaded by the runtime at startup. */
+private const val POLICY_JSON_FILE      = "policy.json"
+/** Filename of the human-readable build report (not packaged into the APK). */
+private const val POLICY_REPORT_FILE    = "policy-report.txt"
+
 /** Merges DSL + optional YAML into a compiled policy asset: poseidon/policy.json. */
 @DisableCachingByDefault(because = "trivial codegen")
 abstract class GeneratePolicyTask : DefaultTask() {
@@ -74,9 +85,9 @@ abstract class GeneratePolicyTask : DefaultTask() {
             acceptProposals = acceptProposals.get(),
         )
 
-        val dir = File(outputDir.get().asFile, "poseidon").apply { mkdirs() }
-        File(dir, "policy.json").writeText(result.policyJson)
-        File(dir, "policy-report.txt").writeText(result.report)
+        val dir = File(outputDir.get().asFile, POLICY_ASSET_SUBDIR).apply { mkdirs() }
+        File(dir, POLICY_JSON_FILE).writeText(result.policyJson)
+        File(dir, POLICY_REPORT_FILE).writeText(result.report)
         logger.lifecycle("[poseidon] ${result.report.lines().first()}")
         if (result.unapprovedProposals.isNotEmpty()) {
             val msg = "[poseidon] ${result.unapprovedProposals.size} unapproved library proposal(s)"
