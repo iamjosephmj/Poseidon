@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.18)
+
+# Shared headers (event_ring.h, host_match.h, shim_internal.h) live in ../include;
+# the translation units #include them by basename, so put it on the include path.
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
+
 project(poseidon_glob_test C)
 add_executable(glob_test glob_test.c)
 
