@@ -24,6 +24,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url = uri("https://jitpack.io") } // Poseidon runtime is consumed from its JitPack release
+        mavenLocal()                              // fallback for a version not yet published to JitPack
     }
 }
 // (mavenLocal only needed for the plugin marker, declared in pluginManagement above)

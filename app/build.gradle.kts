@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("tech.ssemaj.poseidon") version "0.1.1"
+    id("tech.ssemaj.poseidon") version "0.1.2"
 }
 
 android {

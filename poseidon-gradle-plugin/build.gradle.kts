@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "tech.ssemaj.poseidon"
-version = "0.1.1"
+version = "0.1.2"
 
 dependencies {
     // AGP Instrumentation API (provided by the consuming build at runtime).
