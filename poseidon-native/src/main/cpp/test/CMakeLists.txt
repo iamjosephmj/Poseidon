@@ -8,6 +8,6 @@ add_executable(glob_test glob_test.c)
 # no host CRT/glibc-dev).  Run manually when a host toolchain is available:
 #   cmake -S . -B build && cmake --build build && ./build/ring_test
 project(poseidon_ring_test C)
-add_executable(ring_test ring_test.c ../event_ring.c)
+add_executable(ring_test ring_test.c ../audit/event_ring.c)
 target_compile_options(ring_test PRIVATE -std=c11)
 target_link_libraries(ring_test pthread)

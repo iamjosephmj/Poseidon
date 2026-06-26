@@ -2,7 +2,7 @@
    in environments with only an Android NDK cross-compiler and no host CRT/glibc-dev. */
 #include <stdio.h>
 #include <string.h>
-#include "../host_match.h"
+#include "../include/host_match.h"
 
 int main(int argc, char** argv) {
     FILE* f = fopen(argc > 1 ? argv[1] : "glob_vectors.txt", "r");

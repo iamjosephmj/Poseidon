@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdint.h>
-#include "../event_ring.h"
+#include "../include/event_ring.h"
 
 #define PER_THREAD 1000
 #define N_THREADS  2
