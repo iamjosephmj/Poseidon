@@ -1,0 +1,15 @@
+# JitPack build configuration.
+#
+# Publishes the runtime library AARs only:
+#   com.github.iamjosephmj.Poseidon:poseidon-core   (Play-clean JVM)
+#   com.github.iamjosephmj.Poseidon:poseidon-native (libc shim — needs the NDK; AGP auto-provisions)
+#   com.github.iamjosephmj.Poseidon:poseidon-seccomp
+#   com.github.iamjosephmj.Poseidon:poseidon-all    (umbrella)
+#
+# The :app demo and the standalone poseidon-gradle-plugin are intentionally NOT built here
+# (the app applies the plugin from mavenLocal, which isn't available on JitPack's runner).
+jdk:
+  - openjdk17
+
+install:
+  - ./gradlew clean :poseidon-core:publishToMavenLocal :poseidon-native:publishToMavenLocal :poseidon-seccomp:publishToMavenLocal :poseidon-all:publishToMavenLocal --no-daemon --stacktrace
