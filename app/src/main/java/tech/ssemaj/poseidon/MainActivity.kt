@@ -48,6 +48,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.platform.LocalContext
 import tech.ssemaj.poseidon.probes.DemoProbes
 import tech.ssemaj.poseidon.runtime.model.EgressEvent
 import tech.ssemaj.poseidon.runtime.model.Mode
@@ -66,12 +74,14 @@ import tech.ssemaj.poseidon.ui.theme.TridentGold
 class MainActivity : ComponentActivity() {
 
     private val dashboardState = EgressDashboardState()
+    private val verifyState = VerifyState()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // Register Observer sink before the probes fire so no events are missed.
         dashboardState.start()
+        val policy = PolicyInfo.load(applicationContext)
         setContent {
             PoseidonTheme(darkTheme = true) {
                 Scaffold(
@@ -80,6 +90,8 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     PoseidonDashboard(
                         state    = dashboardState,
+                        verify   = verifyState,
+                        policy   = policy,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
@@ -102,13 +114,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PoseidonDashboard(
     state: EgressDashboardState,
+    verify: VerifyState,
+    policy: PolicyInfo,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
 
-    // Keep the newest event visible at the top as long as the user hasn't scrolled down.
+    // Re-pin to the top only when the user is already there, so scrolling/typing isn't yanked.
     LaunchedEffect(state.events.size) {
-        if (listState.firstVisibleItemIndex <= 2) {
+        if (listState.firstVisibleItemIndex == 0) {
             listState.scrollToItem(0)
         }
     }
@@ -117,7 +131,9 @@ fun PoseidonDashboard(
         state    = listState,
         modifier = modifier.fillMaxSize(),
     ) {
-        item(key = "header")     { PoseidonHeader() }
+        item(key = "header")     { PoseidonHeader(policy) }
+        item(key = "policy")     { PolicyCard(policy) }
+        item(key = "verify")     { VerifyCard(verify) }
         item(key = "tiers")      { TiersSection(state = state) }
         item(key = "log_header") { LiveLogHeader(eventCount = state.events.size) }
 
@@ -138,7 +154,7 @@ fun PoseidonDashboard(
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Composable
-fun PoseidonHeader() {
+fun PoseidonHeader(policy: PolicyInfo) {
     // Signature element: animated bioluminescent aura radiates from the trident.
     // A security tool should feel alive — this is the deep-ocean heartbeat.
     val infiniteTransition = rememberInfiniteTransition(label = "trident_aura")
@@ -197,7 +213,7 @@ fun PoseidonHeader() {
 
         Spacer(Modifier.height(20.dp))
 
-        ModeStatusChip()
+        ModeStatusChip(policy)
     }
 }
 
@@ -229,7 +245,7 @@ private fun DrawScope.drawTridentAura(alpha: Float) {
 }
 
 @Composable
-fun ModeStatusChip() {
+fun ModeStatusChip(policy: PolicyInfo) {
     val mode = Mode.current
     val (label, chipColor) = if (mode == Mode.ENFORCE) {
         "ENFORCE" to AquaAllow
@@ -266,7 +282,7 @@ fun ModeStatusChip() {
         }
 
         Text(
-            text  = "1 host · 4 CIDRs",
+            text  = "${policy.allowedHosts.size} host(s) · ${policy.deniedPaths.size} path(s) · ${policy.allowedCidrs.size} CIDRs",
             style = MaterialTheme.typography.labelMedium,
             color = TextSecondary,
         )
@@ -528,6 +544,119 @@ fun LogFooter() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Policy panel + interactive verifier
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A titled ocean-styled card used by the policy + verify panels. */
+@Composable
+private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape          = RoundedCornerShape(10.dp),
+        color          = DeepBlue,
+        tonalElevation = 2.dp,
+        modifier       = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Column(
+            modifier            = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = BioluminescentTeal)
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
+    }
+}
+
+/** Shows the compiled policy — exactly what the manifest is filtering. */
+@Composable
+fun PolicyCard(policy: PolicyInfo) {
+    SectionCard(title = "WHAT WE'RE FILTERING") {
+        val modeColor = if (policy.mode == "enforce") AquaAllow else TridentGold
+        PolicyRow("Mode", policy.mode.uppercase(), modeColor)
+        PolicyRow("Allowed hosts", policy.allowedHosts.joinToString("  ·  ").ifEmpty { "— (default-deny off)" }, BioluminescentTeal)
+        PolicyRow("Denied paths", policy.deniedPaths.joinToString("  ·  ").ifEmpty { "—" }, CoralBlock)
+        PolicyRow("Allowed CIDRs", policy.allowedCidrs.joinToString("  ·  ").ifEmpty { "—" }, TextSecondary)
+        PolicyRow("DNS correlation", if (policy.dnsCorrelation) "on (Go/raw gated by host)" else "off", TextSecondary)
+    }
+}
+
+@Composable
+private fun PolicyRow(label: String, value: String, valueColor: Color) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.width(120.dp))
+        Text(value, style = MaterialTheme.typography.bodySmall, color = valueColor, modifier = Modifier.weight(1f))
+    }
+}
+
+/** Editable URL + a button per Android call style; fires the request live and shows the verdict. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun VerifyCard(verify: VerifyState) {
+    val context = LocalContext.current
+    SectionCard(title = "VERIFY A URL") {
+        Text(
+            "Type a URL and fire it through each client. Try an allowed host, a /blocked/* path, or a non-listed host.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value         = verify.url.value,
+            onValueChange = { verify.url.value = it },
+            singleLine    = true,
+            label         = { Text("URL", color = TextSecondary) },
+            modifier      = Modifier.fillMaxWidth(),
+            colors        = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor   = BioluminescentTeal,
+                unfocusedBorderColor  = MarineBlue,
+                focusedTextColor      = TextPrimary,
+                unfocusedTextColor    = TextPrimary,
+                cursorColor           = BioluminescentTeal,
+            ),
+        )
+        Spacer(Modifier.height(10.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ClientStyle.values().forEach { style ->
+                Button(
+                    onClick = { verify.run(style, context) },
+                    shape   = RoundedCornerShape(8.dp),
+                    colors  = ButtonDefaults.buttonColors(
+                        containerColor = MarineBlue,
+                        contentColor   = BioluminescentTeal,
+                    ),
+                ) {
+                    Text(style.label, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        if (verify.results.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MarineBlue, thickness = 0.5.dp)
+            Spacer(Modifier.height(8.dp))
+            verify.results.forEach { res ->
+                val color = if (res.blocked) CoralBlock else AquaAllow
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(res.client, style = MaterialTheme.typography.labelSmall, color = BioluminescentTeal, modifier = Modifier.width(108.dp))
+                    Text(
+                        text     = res.outcome,
+                        style    = MaterialTheme.typography.bodySmall,
+                        color    = color,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Preview
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -535,6 +664,16 @@ fun LogFooter() {
 @Composable
 fun PoseidonDashboardPreview() {
     PoseidonTheme(darkTheme = true) {
-        PoseidonDashboard(state = EgressDashboardState())
+        PoseidonDashboard(
+            state  = EgressDashboardState(),
+            verify = VerifyState(),
+            policy = PolicyInfo(
+                mode = "enforce",
+                allowedHosts = listOf("example.com"),
+                deniedPaths = listOf("/blocked/*"),
+                allowedCidrs = listOf("104.16.0.0/13", "172.64.0.0/13"),
+                dnsCorrelation = true,
+            ),
+        )
     }
 }
