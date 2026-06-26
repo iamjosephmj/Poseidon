@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.gradle
+package tech.ssemaj.poseidon.gradle.elf
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
@@ -34,8 +34,8 @@ abstract class PoseidonNativeInjectTask : DefaultTask() {
         }
         var injected = 0
         root.walkTopDown()
-            .filter { it.isFile && it.extension == "so" && it.name != ElfInjector.SHIM_SONAME }
-            .forEach { if (ElfInjector.inject(it)) injected++ }
+            .filter { it.isFile && it.extension == "so" && it.name != ShimInjector.SHIM_SONAME }
+            .forEach { if (ShimInjector.inject(it)) injected++ }
         logger.lifecycle("[poseidon] injected shim into $injected native lib(s) (pre-packaging, in place)")
     }
 }

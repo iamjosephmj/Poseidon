@@ -1,9 +1,9 @@
-package tech.ssemaj.poseidon.gradle
+package tech.ssemaj.poseidon.gradle.elf
 
 import java.io.File
 
 /** Injects the Poseidon shim as a DT_NEEDED into a prebuilt ELF .so (pure JVM). */
-object ElfInjector {
+object ShimInjector {
     const val SHIM_SONAME = "libposeidon_shim.so"
 
     /** @return true if injection ran (false if already present / failed). */

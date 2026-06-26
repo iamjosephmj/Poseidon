@@ -2,6 +2,7 @@ package tech.ssemaj.poseidon.gradle
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import tech.ssemaj.poseidon.gradle.policy.AppPolicyXmlParser
 
 class ProposalExtractionTest {
     @Test fun extractsInlineProposalsFromMergedManifest() {
@@ -14,7 +15,7 @@ class ProposalExtractionTest {
               </application>
             </manifest>
         """.trimIndent()
-        val props = GeneratePolicyTask.extractProposals(manifest)
+        val props = AppPolicyXmlParser.parseManifestProposals(manifest)
         assertEquals(2, props.size)
         assertEquals("telemetry.sdk.com", props[0].host)
         assertEquals("com.foo.sdk", props[0].library)
@@ -30,7 +31,7 @@ class ProposalExtractionTest {
               </application>
             </manifest>
         """.trimIndent()
-        val props = GeneratePolicyTask.extractProposals(manifest)
+        val props = AppPolicyXmlParser.parseManifestProposals(manifest)
         assertEquals(1, props.size)
         assertEquals("solo.sdk.com", props[0].host)
         assertEquals("unknown", props[0].library)

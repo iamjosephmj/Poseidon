@@ -1,22 +1,15 @@
-package tech.ssemaj.poseidon.gradle
+package tech.ssemaj.poseidon.gradle.policy
 
 import org.w3c.dom.Element
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
-data class Proposal(val library: String, val host: String)
+/**
+ * Parses the spec §7 <poseidon> XML for the app (authoritative) and libraries (proposals).
+ * Also extracts inline Poseidon proposals from a merged AndroidManifest.
+ */
+object AppPolicyXmlParser {
 
-data class CompiledPolicy(
-    val mode: String,
-    val allowedHosts: List<String>,
-    val deniedPaths: List<String>,
-    val dnsCorrelation: Boolean,
-    val approvedLibraries: Set<String>,
-    val allowedCidrs: List<String> = emptyList(),
-)
-
-/** Parses the spec §7 <poseidon> XML for the app (authoritative) and libraries (proposals). */
-object PolicyXml {
     private fun parse(xml: String): Element {
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = false }
             .newDocumentBuilder().parse(ByteArrayInputStream(xml.toByteArray()))
@@ -32,10 +25,10 @@ object PolicyXml {
         return result
     }
 
-    fun parseAppPolicy(xml: String): CompiledPolicy {
+    fun parseAppPolicy(xml: String): DeclaredPolicy {
         val root = parse(xml)
-        return CompiledPolicy(
-            mode = root.getAttribute("mode").ifEmpty { "monitor" },
+        return DeclaredPolicy(
+            mode = root.getAttribute("mode").ifEmpty { MODE_MONITOR },
             allowedHosts = root.childElements("allow").map { it.getAttribute("host") },
             deniedPaths = root.childElements("deny-path").map { it.getAttribute("pattern") },
             dnsCorrelation = root.getAttribute("nativeDnsCorrelation") == "true",
@@ -46,4 +39,21 @@ object PolicyXml {
 
     fun parseProposals(library: String, xml: String): List<Proposal> =
         parse(xml).childElements("allow").map { Proposal(library, it.getAttribute("host")) }
+
+    /** Reads inline poseidon proposal meta-data from a merged AndroidManifest. */
+    fun parseManifestProposals(manifestXml: String): List<Proposal> {
+        val doc = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(ByteArrayInputStream(manifestXml.toByteArray()))
+        val nodes = doc.getElementsByTagName("meta-data")
+        val out = mutableListOf<Proposal>()
+        for (i in 0 until nodes.length) {
+            val el = nodes.item(i) as Element
+            if (el.getAttribute("android:name") != "tech.ssemaj.poseidon.proposes") continue
+            val lib = el.getAttribute("tools:node").ifEmpty { "unknown" }
+            el.getAttribute("android:value").split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                .forEach { out.add(Proposal(lib, it)) }
+        }
+        return out
+    }
 }

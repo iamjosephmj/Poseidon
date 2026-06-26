@@ -3,6 +3,8 @@ package tech.ssemaj.poseidon.gradle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import tech.ssemaj.poseidon.gradle.policy.AppPolicyXmlParser
+import tech.ssemaj.poseidon.gradle.policy.Proposal
 
 class PolicyXmlTest {
     private val app = """
@@ -15,7 +17,7 @@ class PolicyXmlTest {
     """.trimIndent()
 
     @Test fun parsesAppPolicy() {
-        val p = PolicyXml.parseAppPolicy(app)
+        val p = AppPolicyXmlParser.parseAppPolicy(app)
         assertEquals("enforce", p.mode)
         assertTrue(p.allowedHosts.containsAll(listOf("example.com", "*.api.foo.com")))
         assertEquals(listOf("/internal/*"), p.deniedPaths)
@@ -24,7 +26,7 @@ class PolicyXmlTest {
 
     @Test fun parsesLibraryProposals() {
         val lib = """<poseidon><allow host="telemetry.sdk.com"/></poseidon>"""
-        val props = PolicyXml.parseProposals("com.foo.sdk", lib)
+        val props = AppPolicyXmlParser.parseProposals("com.foo.sdk", lib)
         assertEquals(listOf(Proposal("com.foo.sdk", "telemetry.sdk.com")), props)
     }
 
@@ -35,7 +37,7 @@ class PolicyXmlTest {
               <group><allow host="nested.com"/></group>
             </poseidon>
         """.trimIndent()
-        val p = PolicyXml.parseAppPolicy(xml)
+        val p = AppPolicyXmlParser.parseAppPolicy(xml)
         assertEquals(listOf("top.com"), p.allowedHosts)
     }
 }

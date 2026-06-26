@@ -4,9 +4,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import tech.ssemaj.poseidon.gradle.policy.DeclaredPolicy
+import tech.ssemaj.poseidon.gradle.policy.PolicyCompiler
+import tech.ssemaj.poseidon.gradle.policy.Proposal
 
 class PolicyCompilerTest {
-    private val app = CompiledPolicy("enforce", listOf("example.com"), listOf("/internal/*"), false, setOf("com.ok.sdk"))
+    private val app = DeclaredPolicy("enforce", listOf("example.com"), listOf("/internal/*"), false, setOf("com.ok.sdk"))
 
     @Test fun approvedProposalGrantedUnapprovedRecordedOnly() {
         val proposals = listOf(Proposal("com.ok.sdk", "ok.host.com"), Proposal("com.bad.sdk", "bad.host.com"))

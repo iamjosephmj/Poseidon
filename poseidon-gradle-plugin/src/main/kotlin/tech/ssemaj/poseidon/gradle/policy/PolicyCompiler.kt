@@ -1,15 +1,9 @@
-package tech.ssemaj.poseidon.gradle
-
-data class CompileResult(
-    val policyJson: String,
-    val report: String,
-    val unapprovedProposals: List<Proposal>,
-)
+package tech.ssemaj.poseidon.gradle.policy
 
 /** Merges app policy + DSL + (approved) proposals into the runtime policy.json + a build report. */
 object PolicyCompiler {
     fun compile(
-        app: CompiledPolicy,
+        app: DeclaredPolicy,
         proposals: List<Proposal>,
         dslHosts: List<String>,
         acceptProposals: Boolean,
