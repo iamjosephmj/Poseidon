@@ -257,7 +257,7 @@ and drained off‑thread by a JVM daemon (~250 ms), which symbolizes the origin 
    emits `policy.json` + a human-readable build report (with a warn/error CI gate).
 8. **Decoupled pipeline (design patterns).** Adapter · Bridge (`NativeBridge`) · Observer ·
    Facade (`PoseidonGate`) · Proxy (the shim) · Decorator (`PoseidonInterceptor`) · Visitor
-   (the ASM factory). See [`docs/design-patterns.md`](docs/design-patterns.md).
+   (the ASM factory).
 
 ---
 

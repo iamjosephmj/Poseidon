@@ -237,7 +237,6 @@ See **[ARCH.md](ARCH.md)** — module layout, use‑case and flow diagrams, the 
 pipeline, the three enforcement tiers, the native shim internals, and the underlying
 techniques (ELF `DT_NEEDED` interposition, ASM bytecode transform, seccomp `USER_NOTIF`,
 in‑process DNS correlation, the opt‑in CIDR allow‑list, the lock‑free event ring).
-Design‑pattern notes: [`docs/design-patterns.md`](docs/design-patterns.md).
 
 ## 🤝 Contributing
 
