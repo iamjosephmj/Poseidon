@@ -1,24 +1,29 @@
 <div align="center">
 
-# 🔱 Poseidon
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0a2540,50:0077b6,100:00d4ff&height=210&section=header&text=POSEIDON&fontSize=80&fontColor=ffffff&fontAlignY=38&desc=%F0%9F%94%B1%20%20Network%20egress%20gate%20for%20your%20Android%20SDKs&descSize=20&descAlignY=60&animation=fadeIn" width="100%"/>
 
-**Constrain and observe what the third‑party SDKs in your Android app can reach on the network — across JVM, native, and Go/raw‑syscall code, in‑process, with no VPN and no root.**
+<a href="#-why-i-built-this">
+  <img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=600&size=22&pause=900&color=00D4FF&center=true&vCenter=true&width=760&height=46&lines=Pin+every+SDK+to+a+host+allow-list;Cover+JVM+%E2%80%A2+native+libc+%E2%80%A2+Go%2Fraw-syscall;In-process.+No+VPN.+No+root.;Audit+exactly+what+each+SDK+reaches" alt="What Poseidon does"/>
+</a>
 
-[![CI](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml/badge.svg)](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml)
-[![Release](https://jitpack.io/v/iamjosephmj/Poseidon.svg)](https://jitpack.io/#iamjosephmj/Poseidon)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Android-3DDC84.svg?logo=android&logoColor=white)](#)
-[![minSdk](https://img.shields.io/badge/minSdk-24-blue.svg)](#)
-[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF.svg?logo=kotlin&logoColor=white)](#)
-[![C](https://img.shields.io/badge/native%20shim-C-A8B9CC.svg?logo=c&logoColor=white)](#)
+<br/>
 
-[Why](#why-i-built-this) · [What it is](#what-it-is) · [Install](#install) · [Usage](#usage) · [Coverage](#what-it-covers) · [Limits](#what-it-does-not-do) · [Architecture](ARCH.md) · [Contributing](CONTRIBUTING.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/iamjosephmj/Poseidon/poseidon-ci.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&color=00d4ff)](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml)
+[![JitPack](https://img.shields.io/jitpack/version/com.github.iamjosephmj/Poseidon?style=for-the-badge&logo=jitpack&logoColor=white&label=JitPack&color=0077b6)](https://jitpack.io/#iamjosephmj/Poseidon)
+[![License](https://img.shields.io/badge/License-MIT-0a2540?style=for-the-badge)](LICENSE)
+
+[![Android](https://img.shields.io/badge/Android-24%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#)
+[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)](#)
+[![C](https://img.shields.io/badge/native_shim-C-A8B9CC?style=for-the-badge&logo=c&logoColor=black)](#)
+[![seccomp](https://img.shields.io/badge/seccomp-USER__NOTIF-ff6b6b?style=for-the-badge&logo=linux&logoColor=white)](#)
+
+### 🌊 [Why](#-why-i-built-this) • [What](#-what-it-is) • [Install](#-install) • [Usage](#-usage) • [Coverage](#-what-it-covers) • [Limits](#-what-it-does-not-do) • [Architecture](ARCH.md) • [Contributing](CONTRIBUTING.md)
 
 </div>
 
----
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a2540,50:0077b6,100:00d4ff&height=3" width="100%"/>
 
-## Why I built this
+## 🔱 Why I built this
 
 I've always wondered what a third‑party SDK can quietly exfiltrate from inside an app.
 
@@ -38,10 +43,10 @@ That bothered me enough to turn it into a research project. The question I wante
 
 Poseidon is what came out of that — a build‑time + runtime safeguard, validated end‑to‑end
 on a real device. It is **not** a hardened sandbox against a hostile SDK (nothing in‑process
-can be — see [limits](#what-it-does-not-do)); it's a strong default‑deny egress control and
+can be — see [limits](#-what-it-does-not-do)); it's a strong default‑deny egress control and
 a per‑SDK audit for the realistic, non‑adversarial case.
 
-## What it is
+## 🌊 What it is
 
 You list the hosts your app's SDKs are allowed to reach. Poseidon enforces that list and
 shows you where each SDK actually connects — covering ordinary HTTP libraries, native
@@ -50,9 +55,21 @@ shows you where each SDK actually connects — covering ordinary HTTP libraries,
 Run it in **monitor** mode to just watch and log where each SDK goes, or **enforce** mode to
 block anything that isn't on your list.
 
+<div align="center">
+
+| 🟦 JVM bytecode | 🟪 Native libc | 🟥 seccomp |
+|:---:|:---:|:---:|
+| OkHttp · HttpURLConnection · Volley · Cronet | any SDK using libc (Cronet, WebRTC…) | Go runtimes & raw `syscall()` |
+| host **+ path** (above TLS) | host (ELF `DT_NEEDED` shim) | host (kernel `USER_NOTIF`) |
+| Play‑clean ✅ | opt‑in | opt‑in |
+
+</div>
+
 Curious how it works under the hood? It's all in **[ARCH.md](ARCH.md)** — diagrams included.
 
-## Install
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a2540,50:0077b6,100:00d4ff&height=3" width="100%"/>
+
+## 📦 Install
 
 ### Runtime — via JitPack
 
@@ -68,9 +85,9 @@ dependencyResolutionManagement {
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:<version>")  // full umbrella
+    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.0")  // full umbrella
     // …or just the Play-clean JVM core:
-    // implementation("com.github.iamjosephmj.Poseidon:poseidon-core:<version>")
+    // implementation("com.github.iamjosephmj.Poseidon:poseidon-core:0.1.0")
 }
 ```
 
@@ -94,7 +111,9 @@ plugins {
 }
 ```
 
-## Usage
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a2540,50:0077b6,100:00d4ff&height=3" width="100%"/>
+
+## ⚙️ Usage
 
 ### 1. Declare your policy (app‑authoritative)
 
@@ -136,8 +155,7 @@ poseidon {
 }
 ```
 
-`injectNative` defaults to **`false`**, so the core stays Play‑clean unless you opt in. The
-seccomp gate ships inside `libposeidon_shim.so`, so depending on the native tier includes it.
+`injectNative` defaults to **`false`**, so the core stays Play‑clean unless you opt in.
 
 ### 3. See the audit
 
@@ -160,14 +178,12 @@ Observer.addSink { event ->
 }
 ```
 
-No per‑request app code — the adapters and shim are wired by the build.
+> 💡 **The demo app does exactly this** — its live dashboard subscribes to `Observer.addSink`
+> and lets you fire any URL through each client style to watch Poseidon allow or block it.
 
-> **Library proposals:** a library can *propose* the hosts it needs in its own manifest;
-> the build records each proposal with package attribution but **does not grant it** unless
-> the app approves (`<approve library="…"/>` / `acceptProposals = true`). A CI knob
-> (`proposalsAction = "error"`) fails the build on unapproved proposals.
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a2540,50:0077b6,100:00d4ff&height=3" width="100%"/>
 
-## What it covers
+## ✅ What it covers
 
 - **Host allow / block** for any native or JVM code that reaches the net through libc
   (TCP/UDP/QUIC + DNS), plus Go/raw‑syscall code via seccomp.
@@ -175,7 +191,7 @@ No per‑request app code — the adapters and shim are wired by the build.
 - **Per‑SDK egress audit** — `monitor` mode maps what each library actually reaches,
   attributed by originating `.so` / Java caller.
 
-## What it does NOT do
+## ⚠️ What it does NOT do
 
 I'd rather be honest than oversell this:
 
@@ -194,7 +210,9 @@ I'd rather be honest than oversell this:
 Positioning: a **strong default‑deny egress control + per‑SDK audit for non‑adversarial
 SDKs** — not a guarantee against a hostile SDK or exfil via permitted destinations.
 
-## Status & demo
+<img src="https://capsule-render.vercel.app/api?type=rect&color=0:0a2540,50:0077b6,100:00d4ff&height=3" width="100%"/>
+
+## 🧪 Status & demo
 
 Validated end‑to‑end on a **Pixel 6 Pro (Android 16)** across all three tiers — including
 real `org.chromium.net:cronet-embedded` (native host enforced + Java‑API path observed) and
@@ -211,9 +229,9 @@ adb logcat -s Poseidon PoseidonDemo                         # …and the same st
 
 The demo app fires probes through OkHttp, HttpURLConnection, Volley, Cronet, and a raw
 syscall path — against an allowed host, a denied path, and a denied host — and shows each
-tier's decision live.
+tier's decision live, plus an editable URL you can verify through any client.
 
-## Architecture
+## 🏛️ Architecture
 
 See **[ARCH.md](ARCH.md)** — module layout, use‑case and flow diagrams, the runtime
 pipeline, the three enforcement tiers, the native shim internals, and the underlying
@@ -221,13 +239,17 @@ techniques (ELF `DT_NEEDED` interposition, ASM bytecode transform, seccomp `USER
 in‑process DNS correlation, the opt‑in CIDR allow‑list, the lock‑free event ring).
 Design‑pattern notes: [`docs/design-patterns.md`](docs/design-patterns.md).
 
-## Contributing
+## 🤝 Contributing
 
 Issues and PRs welcome. The codebase has a few **load‑bearing constraints** (the frozen
 `tech.ssemaj.poseidon.runtime` package, the plugin's injected FQN literals, the JNI symbols,
 the native hot‑path rule) that break *silently* if missed — all written up in
 **[CONTRIBUTING.md](CONTRIBUTING.md)**, along with how to build, test, and verify on a device.
 
-## License
+## 📜 License
 
-[MIT](LICENSE) © iamjosephmj
+[MIT](LICENSE) © [iamjosephmj](https://github.com/iamjosephmj)
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:00d4ff,50:0077b6,100:0a2540&height=120&section=footer" width="100%"/>
+
+</div>
