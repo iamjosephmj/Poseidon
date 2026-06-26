@@ -2,6 +2,7 @@ package tech.ssemaj.poseidon.runtime.pipeline
 
 import tech.ssemaj.poseidon.runtime.internal.InternalPoseidonApi
 import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.EgressEvent.Companion.UNKNOWN_PORT
 import tech.ssemaj.poseidon.runtime.model.Tier
 import tech.ssemaj.poseidon.runtime.model.Transport
 import tech.ssemaj.poseidon.runtime.policy.PolicyEngine
@@ -28,7 +29,7 @@ object PoseidonGate {
         val event = EgressEvent(
             ts = System.currentTimeMillis(),
             tid = Process.myTid(),
-            host = host, ip = null, port = -1,
+            host = host, ip = null, port = UNKNOWN_PORT,
             transport = Transport.TCP, path = path, tier = Tier.JVM,
         )
         val decision = PolicyEngine.evaluate(event).also { event.decision = it }

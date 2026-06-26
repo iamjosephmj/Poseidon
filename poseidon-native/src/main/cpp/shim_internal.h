@@ -46,6 +46,10 @@ static inline uint64_t mono_ns(void) {
 int  get_port(const struct sockaddr *sa);
 void host_from_desc(const char *desc, char *out, size_t sz);
 
+/* ---- Shared policy limits ---- */
+#define POSEIDON_DNS_PORT  53   /* destination port exempted as resolver traffic */
+#define POSEIDON_MAX_CIDRS 64   /* maximum CIDR entries accepted via configureCidrs() */
+
 /* ---- DNS cache types (defined in dns_cache.c) ---- */
 #define CACHE_CAP 4096
 typedef struct {

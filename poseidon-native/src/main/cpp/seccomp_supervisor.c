@@ -46,6 +46,16 @@
 #define __NR_io_uring_setup 425   /* same NR across arm64/arm/x86_64/x86 */
 #endif
 
+/* ---- Module-local constants ---- */
+
+/** Maximum UDP/sendmmsg vector length examined by the supervisor per notification.
+ *  Limits the per-notification cost; additional messages in the same call are unchecked. */
+#define POSEIDON_SENDMMSG_MAX_VEC 64
+
+/** Receive buffer for in-process DNS response emulation (recvfrom interception).
+ *  Must be large enough for a typical DNS response including all A/AAAA records. */
+#define POSEIDON_DNS_RESP_BUF 2048
+
 /* ---- Listener fd (published atomically after install) ---- */
 static int       g_notif_fd  = -1;
 static pthread_t g_supervisor;
@@ -173,20 +183,20 @@ static void handle_sendto_notif(const struct seccomp_notif *req,
     const struct sockaddr *dst =
         (const struct sockaddr *) (uintptr_t) req->data.args[4];
 
-    if (get_port(dst) == 53) {
+    if (get_port(dst) == POSEIDON_DNS_PORT) {
         /* DNS query: record fd->hostname, optionally deny. */
         const unsigned char *buf = (const unsigned char *) (uintptr_t) req->data.args[1];
         size_t len = (size_t) req->data.args[2];
         char host[256];
         if (buf && len >= 13 && dns_qname(buf, len, host, sizeof host)) {
             if (host_denied(host)) {
-                ring_push(mono_ns(), host, 53,
+                ring_push(mono_ns(), host, POSEIDON_DNS_PORT,
                           POSEIDON_TRANSPORT_DNS, POSEIDON_TIER_SECCOMP, 1 /*blocked*/, 0);
                 resp->flags = 0;
                 resp->error = -EACCES;
             } else {
                 dnsmap_put((int) req->data.args[0], host);
-                ring_push(mono_ns(), host, 53,
+                ring_push(mono_ns(), host, POSEIDON_DNS_PORT,
                           POSEIDON_TRANSPORT_DNS, POSEIDON_TIER_SECCOMP, 0 /*allowed*/, 0);
             }
         }
@@ -209,7 +219,7 @@ static void handle_sendmsg_notif(long nr,
                                   struct seccomp_notif_resp  *resp) {
     /* Handles both sendmsg (vlen=1) and sendmmsg (vlen from args[2]). */
     unsigned vlen = (nr == __NR_sendmmsg) ? (unsigned) req->data.args[2] : 1u;
-    if (vlen > 64) vlen = 64;
+    if (vlen > POSEIDON_SENDMMSG_MAX_VEC) vlen = POSEIDON_SENDMMSG_MAX_VEC;
 
     for (unsigned k = 0; k < vlen; k++) {
         const struct msghdr *m;
@@ -219,7 +229,7 @@ static void handle_sendmsg_notif(long nr,
             m = (const struct msghdr *) (uintptr_t) req->data.args[1];
         if (!m || !m->msg_name) continue;
         const struct sockaddr *dst = (const struct sockaddr *) m->msg_name;
-        if (get_port(dst) == 53) continue; /* resolver handled by sendto path */
+        if (get_port(dst) == POSEIDON_DNS_PORT) continue; /* resolver handled by sendto path */
         char desc[320];
         if (poseidon_check(dst, desc, sizeof desc, NULL, NULL) == P_BLOCK) {
             char shost[64];
@@ -243,7 +253,7 @@ static void handle_recvfrom_notif(const struct seccomp_notif *req,
 
     /* Emulate recvfrom in-process: read the DNS response, parse A/AAAA
      * answers into the IP->host cache, copy data back to the caller. */
-    unsigned char tmp[2048];
+    unsigned char tmp[POSEIDON_DNS_RESP_BUF];
     size_t want = (size_t) req->data.args[2];
     if (want > sizeof tmp) want = sizeof tmp;
     struct sockaddr_storage src;

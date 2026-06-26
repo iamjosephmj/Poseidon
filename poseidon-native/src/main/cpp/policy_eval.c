@@ -28,7 +28,7 @@ static int    g_host_count = 0;
 static int    g_enforce    = 0;   /* 0 = monitor mode, 1 = enforce */
 
 /* ---- Opt-in CIDR allow-list (pushed via JNI configureCidrs()) ---- */
-static struct { int family; unsigned char net[16]; int prefix; } g_cidrs[64];
+static struct { int family; unsigned char net[16]; int prefix; } g_cidrs[POSEIDON_MAX_CIDRS];
 static int g_cidr_count = 0;
 
 /* ---- Internal helpers ---- */
@@ -81,13 +81,13 @@ static int normalize_peer(const struct sockaddr *sa,
 
     if (family == AF_INET) {
         dport = (int) ntohs(((const struct sockaddr_in *) sa)->sin_port);
-        if (dport == 53) return -1;   /* DNS resolver traffic: exempt */
+        if (dport == POSEIDON_DNS_PORT) return -1;   /* DNS resolver traffic: exempt */
         ip    = &((const struct sockaddr_in *) sa)->sin_addr;
         iplen = 4;
         if (((const unsigned char *) ip)[0] == 127) return -1; /* loopback */
     } else {
         dport = (int) ntohs(((const struct sockaddr_in6 *) sa)->sin6_port);
-        if (dport == 53) return -1;
+        if (dport == POSEIDON_DNS_PORT) return -1;
         const struct in6_addr *a6 = &((const struct sockaddr_in6 *) sa)->sin6_addr;
         if (IN6_IS_ADDR_V4MAPPED(a6)) {
             /* ::ffff:a.b.c.d — match against the IPv4 DNS cache. */
@@ -198,7 +198,7 @@ void policy_set_hosts(char **arr, int n, int enforce) {
 }
 
 void policy_set_cidrs(const poseidon_cidr_t *cidrs, int n) {
-    if (n > 64) n = 64;
+    if (n > POSEIDON_MAX_CIDRS) n = POSEIDON_MAX_CIDRS;
     pthread_mutex_lock(&g_lock);
     g_cidr_count = n;
     for (int i = 0; i < n; i++) {

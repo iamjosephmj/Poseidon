@@ -14,16 +14,31 @@ import tech.ssemaj.poseidon.runtime.pipeline.Observer
  * Package intentionally matches :poseidon-core's package so JNI symbol names
  * (Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_*) bind correctly.
  *
- * The daemon drain thread polls [drainEvents] every ~250 ms and forwards each
- * drained native event to [Observer.record] via [RingEventParser], keeping the
- * native hot path (connect/sendto/getaddrinfo) free of synchronous logging or
- * JNI calls.
+ * The daemon drain thread polls [drainEvents] every ~[DRAIN_POLL_INTERVAL_MS] ms and
+ * forwards each drained native event to [Observer.record] via [RingEventParser], keeping
+ * the native hot path (connect/sendto/getaddrinfo) free of synchronous logging or JNI calls.
  */
 object NativeShimBackend : NativeBridge.Backend {
 
+    /** Logcat tag for all log calls from this backend.
+     *  Mirrors PoseidonConstants.LOG_TAG in :poseidon-core; kept here because
+     *  `internal` visibility does not cross Gradle module boundaries. */
+    private const val LOG_TAG = "Poseidon"
+
+    /** Native library name passed to [System.loadLibrary]. */
+    private const val SHIM_LIB_NAME = "poseidon_shim"
+
+    /** Name of the daemon thread that drains the native lock-free ring into the JVM. */
+    private const val DRAIN_THREAD_NAME = "poseidon-native-drain"
+
+    /** How often (in milliseconds) the JVM drain thread polls [drainEvents] for new events.
+     *  250 ms is a deliberate trade-off: low enough for near-real-time audit visibility,
+     *  high enough to leave the CPU idle almost all of the time. */
+    private const val DRAIN_POLL_INTERVAL_MS = 250L
+
     private val available: Boolean =
-        runCatching { System.loadLibrary("poseidon_shim") }
-            .onFailure { Log.w("Poseidon", "native shim not loadable: ${it.message}") }
+        runCatching { System.loadLibrary(SHIM_LIB_NAME) }
+            .onFailure { Log.w(LOG_TAG, "native shim not loadable: ${it.message}") }
             .isSuccess
 
     init {
@@ -80,7 +95,7 @@ object NativeShimBackend : NativeBridge.Backend {
     override fun apply(allowedHosts: List<String>, enforce: Boolean) {
         if (!available) return
         runCatching { configure(allowedHosts.toTypedArray(), if (enforce) 1 else 0) }
-            .onFailure { Log.w("Poseidon", "native configure failed: ${it.message}") }
+            .onFailure { Log.w(LOG_TAG, "native configure failed: ${it.message}") }
     }
 
     override fun cacheHostIps(host: String, ips: Array<String>) {
@@ -91,13 +106,13 @@ object NativeShimBackend : NativeBridge.Backend {
     override fun setAllowedCidrs(cidrs: List<String>) {
         if (!available) return
         runCatching { configureCidrs(cidrs.toTypedArray()) }
-            .onFailure { Log.w("Poseidon", "native configureCidrs failed: ${it.message}") }
+            .onFailure { Log.w(LOG_TAG, "native configureCidrs failed: ${it.message}") }
     }
 
     override fun installSeccompGate(dnsCorrelation: Boolean) {
         if (!available) return
         runCatching { installSeccomp(if (dnsCorrelation) 1 else 0) }
-            .onFailure { Log.w("Poseidon", "seccomp gate install failed: ${it.message}") }
+            .onFailure { Log.w(LOG_TAG, "seccomp gate install failed: ${it.message}") }
     }
 
     // ---- Public test/probe helpers (used by RawSyscallProbe / RawDnsProbe in :app) ----
@@ -115,13 +130,13 @@ object NativeShimBackend : NativeBridge.Backend {
     fun probeSeccomp() {
         if (!available) return
         runCatching { seccompProbe() }
-            .onFailure { Log.w("Poseidon", "seccomp probe failed: ${it.message}") }
+            .onFailure { Log.w(LOG_TAG, "seccomp probe failed: ${it.message}") }
     }
 
     // ---- Daemon drain thread ----
 
     /**
-     * Starts a single daemon thread that polls [drainEvents] every ~250 ms
+     * Starts a single daemon thread that polls [drainEvents] every ~[DRAIN_POLL_INTERVAL_MS] ms
      * and forwards each event to [Observer.record] via [RingEventParser].
      *
      * The thread is a daemon so it never prevents JVM shutdown.
@@ -131,7 +146,7 @@ object NativeShimBackend : NativeBridge.Backend {
         Thread({
             while (true) {
                 try {
-                    Thread.sleep(250L)
+                    Thread.sleep(DRAIN_POLL_INTERVAL_MS)
                     for (raw in drainEvents()) {
                         try {
                             val event = RingEventParser.parse(raw) { symbolize(it) } ?: continue
@@ -147,7 +162,7 @@ object NativeShimBackend : NativeBridge.Backend {
                     // Never crash the drain thread on unexpected errors.
                 }
             }
-        }, "poseidon-native-drain").apply {
+        }, DRAIN_THREAD_NAME).apply {
             isDaemon = true
             start()
         }

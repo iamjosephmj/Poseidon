@@ -2,6 +2,7 @@ package tech.ssemaj.poseidon.runtime.pipeline
 
 import tech.ssemaj.poseidon.runtime.model.EgressEvent
 import tech.ssemaj.poseidon.runtime.model.Mode
+import tech.ssemaj.poseidon.runtime.internal.PoseidonConstants.LOG_TAG
 
 import android.util.Log
 import java.util.concurrent.CopyOnWriteArrayList
@@ -47,6 +48,6 @@ object Observer {
 
     private fun logSink(e: EgressEvent) {
         val verdict = e.decision?.takeIf { it.block }?.let { "BLOCK (${it.reason})" } ?: "ALLOW"
-        Log.i("Poseidon", "[${Mode.current}/${e.tier}] ${e.host ?: e.ip}${e.path ?: ""} -> $verdict")
+        Log.i(LOG_TAG, "[${Mode.current}/${e.tier}] ${e.host ?: e.ip}${e.path ?: ""} -> $verdict")
     }
 }

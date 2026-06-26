@@ -17,4 +17,14 @@ data class EgressEvent(
     val tier: Tier = Tier.JVM,
     val originToken: Any? = null,
     var decision: Decision? = null,
-)
+) {
+    companion object {
+        /**
+         * Sentinel value for [port] when the port is not available at the intercept site
+         * (e.g. JVM-tier interception happens before the transport layer assigns a port).
+         * Distinguishable from port 0 (valid ephemeral port) and from native events
+         * where 0 is used as "unknown" in the wire format.
+         */
+        const val UNKNOWN_PORT = -1
+    }
+}

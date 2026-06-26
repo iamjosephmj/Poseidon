@@ -52,9 +52,9 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_configureCidrs(
     JNIEnv *env, jobject thiz, jobjectArray arr) {
     (void) thiz;
     int n = (*env)->GetArrayLength(env, arr);
-    if (n > 64) n = 64;
+    if (n > POSEIDON_MAX_CIDRS) n = POSEIDON_MAX_CIDRS;
 
-    poseidon_cidr_t cidrs[64];
+    poseidon_cidr_t cidrs[POSEIDON_MAX_CIDRS];
     int count = 0;
 
     for (int i = 0; i < n; i++) {
@@ -204,7 +204,7 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawResolve(
     struct sockaddr_in dns;
     memset(&dns, 0, sizeof dns);
     dns.sin_family = AF_INET;
-    dns.sin_port   = htons(53);
+    dns.sin_port   = htons(POSEIDON_DNS_PORT);
     inet_pton(AF_INET, "8.8.8.8", &dns.sin_addr);
     sendto(s, q, (size_t) ql, 0, (struct sockaddr *) &dns, sizeof dns);
 
