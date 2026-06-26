@@ -21,13 +21,10 @@ import tech.ssemaj.poseidon.runtime.pipeline.Observer
  */
 object NativeShimBackend : NativeBridge.Backend {
 
-    private val available: Boolean = try {
-        System.loadLibrary("poseidon_shim")
-        true
-    } catch (t: Throwable) {
-        Log.w("Poseidon", "native shim not loadable: ${t.message}")
-        false
-    }
+    private val available: Boolean =
+        runCatching { System.loadLibrary("poseidon_shim") }
+            .onFailure { Log.w("Poseidon", "native shim not loadable: ${it.message}") }
+            .isSuccess
 
     init {
         if (available) {
@@ -82,34 +79,25 @@ object NativeShimBackend : NativeBridge.Backend {
 
     override fun apply(allowedHosts: List<String>, enforce: Boolean) {
         if (!available) return
-        try {
-            configure(allowedHosts.toTypedArray(), if (enforce) 1 else 0)
-        } catch (t: Throwable) {
-            Log.w("Poseidon", "native configure failed: ${t.message}")
-        }
+        runCatching { configure(allowedHosts.toTypedArray(), if (enforce) 1 else 0) }
+            .onFailure { Log.w("Poseidon", "native configure failed: ${it.message}") }
     }
 
     override fun cacheHostIps(host: String, ips: Array<String>) {
         if (!available) return
-        try { cacheHost(host, ips) } catch (_: Throwable) {}
+        runCatching { cacheHost(host, ips) }
     }
 
     override fun setAllowedCidrs(cidrs: List<String>) {
         if (!available) return
-        try {
-            configureCidrs(cidrs.toTypedArray())
-        } catch (t: Throwable) {
-            Log.w("Poseidon", "native configureCidrs failed: ${t.message}")
-        }
+        runCatching { configureCidrs(cidrs.toTypedArray()) }
+            .onFailure { Log.w("Poseidon", "native configureCidrs failed: ${it.message}") }
     }
 
     override fun installSeccompGate(dnsCorrelation: Boolean) {
         if (!available) return
-        try {
-            installSeccomp(if (dnsCorrelation) 1 else 0)
-        } catch (t: Throwable) {
-            Log.w("Poseidon", "seccomp gate install failed: ${t.message}")
-        }
+        runCatching { installSeccomp(if (dnsCorrelation) 1 else 0) }
+            .onFailure { Log.w("Poseidon", "seccomp gate install failed: ${it.message}") }
     }
 
     // ---- Public test/probe helpers (used by RawSyscallProbe / RawDnsProbe in :app) ----
@@ -126,11 +114,8 @@ object NativeShimBackend : NativeBridge.Backend {
     /** Feasibility probe: can this app process install a seccomp filter (to cover Go)? */
     fun probeSeccomp() {
         if (!available) return
-        try {
-            seccompProbe()
-        } catch (t: Throwable) {
-            Log.w("Poseidon", "seccomp probe failed: ${t.message}")
-        }
+        runCatching { seccompProbe() }
+            .onFailure { Log.w("Poseidon", "seccomp probe failed: ${it.message}") }
     }
 
     // ---- Daemon drain thread ----
@@ -143,12 +128,11 @@ object NativeShimBackend : NativeBridge.Backend {
      * All exceptions inside the loop are swallowed to prevent crashing the app.
      */
     private fun startDrainThread() {
-        val thread = Thread({
+        Thread({
             while (true) {
                 try {
                     Thread.sleep(250L)
-                    val events = drainEvents()
-                    for (raw in events) {
+                    for (raw in drainEvents()) {
                         try {
                             val event = RingEventParser.parse(raw) { symbolize(it) } ?: continue
                             Observer.record(event)
@@ -163,8 +147,9 @@ object NativeShimBackend : NativeBridge.Backend {
                     // Never crash the drain thread on unexpected errors.
                 }
             }
-        }, "poseidon-native-drain")
-        thread.isDaemon = true
-        thread.start()
+        }, "poseidon-native-drain").apply {
+            isDaemon = true
+            start()
+        }
     }
 }

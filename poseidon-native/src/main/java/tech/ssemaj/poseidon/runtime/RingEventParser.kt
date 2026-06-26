@@ -48,9 +48,8 @@ internal object RingEventParser {
         val action   = if (blocked) Action.BLOCK else Action.ALLOW
         val decision = Decision(action = action, reason = if (blocked) "native-block" else "")
 
-        val originSymbol: String? = if (originAddr != 0L) {
-            try { symbolize(originAddr) } catch (_: Throwable) { null }
-        } else null
+        val originSymbol: String? = originAddr.takeIf { it != 0L }
+            ?.let { runCatching { symbolize(it) }.getOrNull() }
 
         return EgressEvent(
             ts          = ts,
