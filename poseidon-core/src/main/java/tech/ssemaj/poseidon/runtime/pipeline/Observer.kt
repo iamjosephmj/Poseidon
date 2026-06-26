@@ -23,13 +23,8 @@ object Observer {
 
     /** Publish [event] to every registered observer. Never throws. */
     @JvmStatic fun record(event: EgressEvent) {
-        for (sink in sinks) {
-            try {
-                sink(event)
-            } catch (_: Throwable) {
-                // An observer must never break the audit fan-out (or, in enforce, a block).
-            }
-        }
+        // An observer must never break the audit fan-out (or, in enforce, a block).
+        sinks.forEach { sink -> runCatching { sink(event) } }
     }
 
     /** Register an additional observer without removing existing ones. */

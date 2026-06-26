@@ -27,10 +27,9 @@ object PoseidonCronet {
         callback: UrlRequest.Callback,
         executor: Executor,
     ): UrlRequest.Builder {
-        try {
+        runCatching {
             val u = URL(url)
             PoseidonGate.shouldBlock(u.host, normalizePath(u.path))
-        } catch (_: Throwable) {
         }
         return engine.newUrlRequestBuilder(url, callback, executor)
     }

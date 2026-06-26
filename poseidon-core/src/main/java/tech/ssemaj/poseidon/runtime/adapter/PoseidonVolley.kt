@@ -18,11 +18,10 @@ import java.net.URL
 object PoseidonVolley {
     @JvmStatic
     fun onAdd(request: Request<*>) {
-        try {
+        // malformed URL or non-HTTP request: leave it alone
+        runCatching {
             val u = URL(request.url)
             if (PoseidonGate.shouldBlock(u.host, normalizePath(u.path))) request.cancel()
-        } catch (_: Throwable) {
-            // malformed URL or non-HTTP request: leave it alone
         }
     }
 }

@@ -18,12 +18,12 @@ internal object HostIpCacheSeeder {
 
     fun seed(host: String) {
         if (host.isEmpty() || !seeded.add(host)) return
-        try {
+        runCatching {
             InetAddress.getAllByName(host)
                 .mapNotNull { it.hostAddress }
                 .takeIf { it.isNotEmpty() }
                 ?.let { NativeBridge.cacheHostIps(host, it.toTypedArray()) }
-        } catch (_: Throwable) {}
+        }
     }
 
     /**

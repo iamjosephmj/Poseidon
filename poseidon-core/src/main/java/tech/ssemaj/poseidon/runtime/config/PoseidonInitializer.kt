@@ -13,7 +13,7 @@ class PoseidonInitializer : Initializer<Unit> {
     override fun create(context: Context) {
         // Discover the optional native backend (poseidon-native). Triggers NativeShimBackend's
         // object init -> loadLibrary + NativeBridge.register(this). Absent in JVM-only builds.
-        try { Class.forName("tech.ssemaj.poseidon.runtime.NativeShimBackend") } catch (_: Throwable) {}
+        runCatching { Class.forName("tech.ssemaj.poseidon.runtime.NativeShimBackend") }
         try {
             val config = PolicyAssetLoader.load(context)
             PolicyInstaller.install(config)
