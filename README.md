@@ -228,3 +228,9 @@ pipeline, the three enforcement tiers, the native shim internals, and the underl
 techniques (ELF `DT_NEEDED` interposition, ASM bytecode transform, seccomp `USER_NOTIF`,
 in‑process DNS correlation, the opt‑in CIDR allow‑list, and the lock‑free event ring).
 Design‑pattern notes are in [`docs/design-patterns.md`](docs/design-patterns.md).
+
+---
+
+## License
+
+[MIT](LICENSE) © iamjosephmj
