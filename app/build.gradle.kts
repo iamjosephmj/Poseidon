@@ -47,13 +47,10 @@ android {
 
 poseidon {
     // policyXml (default: src/main/res/xml/poseidon_policy.xml) is the canonical source.
-    // Use DSL fields below only as an escape hatch (e.g. adding extra hosts or overriding mode
-    // without touching the XML resource).
-    nativeDnsCorrelation = true // opt in to Go/raw-syscall DNS correlation (costly; demo)
+    // injectNative + nativeDnsCorrelation are ON by default, so native (libc/Cronet) and
+    // Go/raw-syscall traffic are host-enforced with no config here — this block is left to
+    // document the escape hatches.
     // proposalsAction = "error"  // uncomment in CI to fail on unapproved library proposals
-    // This app depends on :poseidon-all (includes libposeidon_shim.so), so enable ELF injection
-    // so that native-SDK (libc) traffic — e.g. libcronet — is also host-enforced.
-    injectNative = true
 }
 
 dependencies {

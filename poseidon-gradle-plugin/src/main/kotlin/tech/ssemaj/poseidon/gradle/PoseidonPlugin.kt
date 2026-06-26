@@ -87,8 +87,8 @@ class PoseidonPlugin : Plugin<Project> {
 
             // Native host layer: inject the shim into the stripped native libs in place,
             // AFTER strip and BEFORE package — no re-sign, nothing after R8.
-            // Gated by ext.injectNative (default false) — keeps the JVM-only
-            // :poseidon-core path Play-clean (no binary modification).
+            // Gated by ext.injectNative (default true; the task self-skips when the shim
+            // isn't packaged, so a JVM-only :poseidon-core build stays Play-clean).
             if (ext.injectNative) registerNativeInjection(project, capitalizedVariant, variant.name)
         }
     }

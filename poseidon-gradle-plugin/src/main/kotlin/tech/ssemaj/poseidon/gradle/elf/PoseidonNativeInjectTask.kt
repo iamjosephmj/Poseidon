@@ -32,9 +32,16 @@ abstract class PoseidonNativeInjectTask : DefaultTask() {
             logger.lifecycle("[poseidon] no native libs to inject")
             return
         }
+        val libs = root.walkTopDown().filter { it.isFile && it.extension == "so" }.toList()
+        if (libs.none { it.name == ShimInjector.SHIM_SONAME }) {
+            // The shim isn't packaged (no :poseidon-native / :poseidon-all dependency).
+            // Injecting a DT_NEEDED for an absent lib would break loading at runtime — so
+            // skip. This makes injectNative safe to leave on by default.
+            logger.lifecycle("[poseidon] libposeidon_shim.so not packaged — skipping native injection")
+            return
+        }
         var injected = 0
-        root.walkTopDown()
-            .filter { it.isFile && it.extension == "so" && it.name != ShimInjector.SHIM_SONAME }
+        libs.filter { it.name != ShimInjector.SHIM_SONAME }
             .forEach { if (ShimInjector.inject(it)) injected++ }
         logger.lifecycle("[poseidon] injected shim into $injected native lib(s) (pre-packaging, in place)")
     }

@@ -18,12 +18,12 @@ open class PoseidonExtension {
     var policyFile: String? = null
 
     /**
-     * Opt-in: trap sendto/recvfrom to correlate Go/raw-syscall DNS (IP->host) so the
-     * native gate can enforce Go traffic by hostname. Costs ~160µs per datagram op —
-     * brutal for UDP/QUIC-heavy apps — so default OFF. The connect-gate (host enforce)
-     * runs regardless; this only adds Go *DNS* correlation.
+     * Trap sendto/recvfrom to correlate Go/raw-syscall DNS (IP->host) so the native gate
+     * can enforce Go traffic by hostname. Default ON for full coverage. The connect-gate
+     * (host enforce) runs regardless; this only adds Go *DNS* correlation, which costs
+     * ~160µs per datagram op — set false for UDP/QUIC-heavy apps where that hurts.
      */
-    var nativeDnsCorrelation: Boolean = false
+    var nativeDnsCorrelation: Boolean = true
 
     /** App-authoritative manifest policy XML (relative to the module). Canonical source. */
     var policyXml: String? = "src/main/res/xml/poseidon_policy.xml"
@@ -45,10 +45,11 @@ open class PoseidonExtension {
     var proposalsAction: String = "warn"
 
     /**
-     * Opt-in: inject the libposeidon_shim.so DT_NEEDED into the app's native libraries at
-     * build time so native-SDK (libc) traffic is host-enforced. Requires the shim to be
-     * packaged (depend on :poseidon-native or :poseidon-all). Default OFF keeps the
-     * JVM-only :poseidon-core configuration Play-clean (no binary modification).
+     * Inject the libposeidon_shim.so DT_NEEDED into the app's native libraries at build time
+     * so native-SDK (libc) traffic is host-enforced. Default ON for full coverage; it safely
+     * no-ops when the shim isn't packaged (a :poseidon-core-only build), so it never produces
+     * a dangling dependency. Set false for a strictly Play-clean build with no binary
+     * modification even when :poseidon-native/:poseidon-all is on the classpath.
      */
-    var injectNative: Boolean = false
+    var injectNative: Boolean = true
 }

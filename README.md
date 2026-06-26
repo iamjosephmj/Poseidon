@@ -132,19 +132,20 @@ Observer.addSink { e -> myMetrics.record(e.tier, e.host, e.decision?.block == tr
 | `<deny-path pattern="/internal/*">` | Block specific URL paths (HTTP libraries only — paths are hidden by TLS for native traffic). |
 | `<allow-cidr value="104.16.0.0/13">` | Permit an IP range — for native/Go code that connects by raw IP. |
 
-Native (C/C++) and Go/raw-syscall coverage is opt-in — flip it on when you need it:
+With `:poseidon-all`, native (C/C++) and Go/raw-syscall coverage is **on by default** —
+nothing to configure. You can tune it if you want:
 
 ```kotlin
-// app/build.gradle.kts
+// app/build.gradle.kts (optional — these are the defaults)
 poseidon {
-    injectNative = true            // also guard native-library (libc) traffic
+    injectNative = true            // guard native-library (libc) traffic
     nativeDnsCorrelation = true    // map Go/raw connections back to hostnames
 }
 ```
 
-> `:poseidon-all` is the full umbrella. For a **Play-clean, JVM-only** build with no binary
-> changes, depend on `com.github.iamjosephmj.Poseidon:poseidon-core:0.1.1` and leave
-> `injectNative` off.
+> Want a **Play-clean, JVM-only** build with no binary changes? Depend on
+> `com.github.iamjosephmj.Poseidon:poseidon-core:0.1.1` instead of `poseidon-all`, or set
+> `injectNative = false`.
 
 ## 🧪 Try it
 
