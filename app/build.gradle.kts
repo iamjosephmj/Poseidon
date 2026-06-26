@@ -63,8 +63,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // Poseidon: all-umbrella brings core + native shim + seccomp tier.
-    implementation(project(":poseidon-all"))
+    // Poseidon: all-umbrella (core + native shim + seccomp) — consumed from the published
+    // JitPack release to dogfood the real artifact rather than the local module.
+    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.1")
     implementation("org.chromium.net:cronet-embedded:143.7445.0")
     implementation("com.android.volley:volley:1.2.1")
     // OkHttp present so the plugin's bytecode transform has something to instrument.
