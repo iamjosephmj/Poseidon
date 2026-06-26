@@ -1,6 +1,8 @@
 package tech.ssemaj.poseidon.runtime
 
 import android.util.Log
+import tech.ssemaj.poseidon.runtime.internal.NativeBridge
+import tech.ssemaj.poseidon.runtime.pipeline.Observer
 
 /**
  * Pattern: **Adapter** — adapts the native `libposeidon_shim.so` (JNI) to the core's

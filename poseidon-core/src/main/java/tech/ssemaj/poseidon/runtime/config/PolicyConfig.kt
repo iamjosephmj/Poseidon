@@ -1,4 +1,6 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.config
+
+import tech.ssemaj.poseidon.runtime.model.Mode
 
 /** Parsed value object from poseidon/policy.json. */
 internal data class PolicyConfig(

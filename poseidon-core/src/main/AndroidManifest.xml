@@ -10,7 +10,7 @@
             android:exported="false"
             tools:node="merge">
             <meta-data
-                android:name="tech.ssemaj.poseidon.runtime.PoseidonInitializer"
+                android:name="tech.ssemaj.poseidon.runtime.config.PoseidonInitializer"
                 android:value="androidx.startup" />
         </provider>
     </application>

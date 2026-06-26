@@ -1,5 +1,11 @@
 package tech.ssemaj.poseidon.runtime
 
+import tech.ssemaj.poseidon.runtime.model.Action
+import tech.ssemaj.poseidon.runtime.model.Decision
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.Tier
+import tech.ssemaj.poseidon.runtime.model.Transport
+
 /**
  * Parses compact ring-event strings produced by the native drainEvents JNI call
  * into [EgressEvent] instances.

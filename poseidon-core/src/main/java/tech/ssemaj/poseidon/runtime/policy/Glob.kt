@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.policy
 
 /** Shared glob-matching logic; semantics mirror native fnmatch. '*' matches any sequence. */
 internal object Glob {

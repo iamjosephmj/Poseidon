@@ -1,4 +1,6 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.config
+
+import tech.ssemaj.poseidon.runtime.model.Mode
 
 import android.content.Context
 import org.json.JSONObject

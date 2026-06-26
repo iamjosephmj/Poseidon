@@ -1,6 +1,11 @@
 @file:OptIn(InternalPoseidonApi::class)
 
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.config
+
+import tech.ssemaj.poseidon.runtime.internal.InternalPoseidonApi
+import tech.ssemaj.poseidon.runtime.internal.NativeBridge
+import tech.ssemaj.poseidon.runtime.model.Mode
+import tech.ssemaj.poseidon.runtime.policy.PolicyEngine
 
 /**
  * Wires a parsed [PolicyConfig] into the running process in the prescribed order:

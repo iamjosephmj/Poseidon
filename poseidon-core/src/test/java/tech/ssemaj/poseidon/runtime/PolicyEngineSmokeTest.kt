@@ -1,5 +1,10 @@
 package tech.ssemaj.poseidon.runtime
 
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.Tier
+import tech.ssemaj.poseidon.runtime.model.Transport
+import tech.ssemaj.poseidon.runtime.policy.PolicyEngine
+
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

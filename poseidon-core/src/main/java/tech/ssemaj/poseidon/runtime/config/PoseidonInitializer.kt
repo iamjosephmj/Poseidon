@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.config
 
 import android.content.Context
 import android.util.Log

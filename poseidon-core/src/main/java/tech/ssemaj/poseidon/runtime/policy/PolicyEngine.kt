@@ -1,4 +1,9 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.policy
+
+import tech.ssemaj.poseidon.runtime.model.Action
+import tech.ssemaj.poseidon.runtime.model.Decision
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.Tier
 
 /**
  * Host = allow-list (default-deny once configured); Path = deny-list (default-allow).

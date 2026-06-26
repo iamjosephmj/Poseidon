@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.model
 
 /**
  * Source-agnostic egress record. Interceptors fill everything except [decision];

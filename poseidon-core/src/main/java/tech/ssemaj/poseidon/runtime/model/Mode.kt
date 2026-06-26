@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.model
 
 /** MONITOR logs what would happen; ENFORCE acts on policy. Set per build type. */
 enum class Mode {

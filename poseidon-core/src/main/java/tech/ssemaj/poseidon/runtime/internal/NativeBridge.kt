@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.internal
 
 /**
  * Pattern: **Bridge** (internal seam — NOT a consumer API) — decouples the abstraction

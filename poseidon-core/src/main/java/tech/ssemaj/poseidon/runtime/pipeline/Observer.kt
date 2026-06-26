@@ -1,4 +1,7 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.pipeline
+
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
+import tech.ssemaj.poseidon.runtime.model.Mode
 
 import android.util.Log
 import java.util.concurrent.CopyOnWriteArrayList

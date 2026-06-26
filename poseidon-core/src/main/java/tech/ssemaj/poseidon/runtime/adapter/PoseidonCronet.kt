@@ -1,6 +1,10 @@
 @file:OptIn(InternalPoseidonApi::class)
 
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.adapter
+
+import tech.ssemaj.poseidon.runtime.internal.InternalPoseidonApi
+import tech.ssemaj.poseidon.runtime.pipeline.PoseidonGate
+import tech.ssemaj.poseidon.runtime.pipeline.normalizePath
 
 import org.chromium.net.CronetEngine
 import org.chromium.net.UrlRequest

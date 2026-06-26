@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.model
 
 /** Result of a policy lookup. matchedRule is the glob/rule that decided it (for audit). */
 data class Decision(

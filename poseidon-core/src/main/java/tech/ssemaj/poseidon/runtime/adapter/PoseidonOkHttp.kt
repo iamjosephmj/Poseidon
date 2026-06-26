@@ -1,6 +1,8 @@
 @file:OptIn(InternalPoseidonApi::class)
 
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.adapter
+
+import tech.ssemaj.poseidon.runtime.internal.InternalPoseidonApi
 
 import okhttp3.OkHttpClient
 

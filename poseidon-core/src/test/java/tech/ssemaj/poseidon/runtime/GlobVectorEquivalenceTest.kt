@@ -1,5 +1,7 @@
 package tech.ssemaj.poseidon.runtime
 
+import tech.ssemaj.poseidon.runtime.policy.Glob
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

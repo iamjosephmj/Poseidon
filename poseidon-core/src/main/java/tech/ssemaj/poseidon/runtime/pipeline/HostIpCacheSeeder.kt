@@ -1,6 +1,9 @@
 @file:OptIn(InternalPoseidonApi::class)
 
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.pipeline
+
+import tech.ssemaj.poseidon.runtime.internal.InternalPoseidonApi
+import tech.ssemaj.poseidon.runtime.internal.NativeBridge
 
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap

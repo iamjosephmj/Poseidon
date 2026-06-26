@@ -1,4 +1,4 @@
-package tech.ssemaj.poseidon.runtime
+package tech.ssemaj.poseidon.runtime.internal
 
 /**
  * Marks a declaration as a Poseidon internal seam — not a stable consumer API.
