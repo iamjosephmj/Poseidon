@@ -1,5 +1,12 @@
 # Poseidon
 
+[![CI](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml/badge.svg)](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84.svg?logo=android&logoColor=white)](#)
+[![minSdk](https://img.shields.io/badge/minSdk-24-blue.svg)](#)
+[![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF.svg?logo=kotlin&logoColor=white)](#)
+[![C](https://img.shields.io/badge/native%20shim-C-A8B9CC.svg?logo=c&logoColor=white)](#)
+
 **Constrain and observe what the third‑party SDKs in your Android app can reach on the network — across JVM, native, and Go/raw‑syscall code, in‑process, with no VPN and no root.**
 
 ---
@@ -222,6 +229,15 @@ pipeline, the three enforcement tiers, the native shim internals, and the underl
 techniques (ELF `DT_NEEDED` interposition, ASM bytecode transform, seccomp `USER_NOTIF`,
 in‑process DNS correlation, the opt‑in CIDR allow‑list, and the lock‑free event ring).
 Design‑pattern notes are in [`docs/design-patterns.md`](docs/design-patterns.md).
+
+---
+
+## Contributing
+
+Issues and PRs welcome. The codebase has a few **load‑bearing constraints** (the frozen
+`tech.ssemaj.poseidon.runtime` package, the plugin's injected FQN literals, the JNI symbols,
+the native hot‑path rule) that break silently if missed — they're all written up in
+**[CONTRIBUTING.md](CONTRIBUTING.md)** along with how to build, test, and verify on a device.
 
 ---
 
