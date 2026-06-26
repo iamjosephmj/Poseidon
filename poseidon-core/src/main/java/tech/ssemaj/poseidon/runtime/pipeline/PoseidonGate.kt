@@ -31,11 +31,8 @@ object PoseidonGate {
             host = host, ip = null, port = -1,
             transport = Transport.TCP, path = path, tier = Tier.JVM,
         )
-        val decision = PolicyEngine.evaluate(event)
-        event.decision = decision
+        val decision = PolicyEngine.evaluate(event).also { event.decision = it }
         Observer.record(event)
-        val block = ModeGate.shouldBlock(decision)
-        if (!block) HostIpCacheSeeder.seed(host)
-        return block
+        return ModeGate.shouldBlock(decision).also { if (!it) HostIpCacheSeeder.seed(host) }
     }
 }

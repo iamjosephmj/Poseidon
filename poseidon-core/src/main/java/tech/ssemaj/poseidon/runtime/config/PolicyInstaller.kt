@@ -12,11 +12,11 @@ import tech.ssemaj.poseidon.runtime.policy.PolicyEngine
  * PolicyEngine → Mode → NativeBridge host list → NativeBridge CIDRs → seccomp gate.
  */
 internal object PolicyInstaller {
-    fun install(config: PolicyConfig) {
-        PolicyEngine.configure(config.allowedHosts, config.deniedPaths)
-        Mode.current = config.mode
-        NativeBridge.apply(config.allowedHosts, config.mode == Mode.ENFORCE)
-        NativeBridge.setAllowedCidrs(config.allowedCidrs)
-        NativeBridge.installSeccompGate(config.mode == Mode.ENFORCE || config.dnsCorrelation)
+    fun install(config: PolicyConfig) = with(config) {
+        PolicyEngine.configure(allowedHosts, deniedPaths)
+        Mode.current = mode
+        NativeBridge.apply(allowedHosts, mode == Mode.ENFORCE)
+        NativeBridge.setAllowedCidrs(allowedCidrs)
+        NativeBridge.installSeccompGate(mode == Mode.ENFORCE || dnsCorrelation)
     }
 }

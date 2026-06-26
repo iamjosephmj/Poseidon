@@ -13,18 +13,18 @@ internal object PolicyAssetLoader {
     fun load(context: Context): PolicyConfig {
         val json = context.assets.open("poseidon/policy.json")
             .bufferedReader().use { it.readText() }
-        val o = JSONObject(json)
-        return PolicyConfig(
-            mode = if (o.optString("mode") == "enforce") Mode.ENFORCE else Mode.MONITOR,
-            allowedHosts = o.strings("allowedHosts"),
-            deniedPaths = o.strings("deniedPaths"),
-            allowedCidrs = o.strings("allowedCidrs"),
-            dnsCorrelation = o.optBoolean("dnsCorrelation", false),
-        )
+        return with(JSONObject(json)) {
+            PolicyConfig(
+                mode = if (optString("mode") == "enforce") Mode.ENFORCE else Mode.MONITOR,
+                allowedHosts = stringList("allowedHosts"),
+                deniedPaths = stringList("deniedPaths"),
+                allowedCidrs = stringList("allowedCidrs"),
+                dnsCorrelation = optBoolean("dnsCorrelation", false),
+            )
+        }
     }
 
-    private fun JSONObject.strings(key: String): List<String> {
-        val arr = optJSONArray(key) ?: return emptyList()
-        return (0 until arr.length()).map { arr.getString(it) }
-    }
+    private fun JSONObject.stringList(key: String): List<String> =
+        optJSONArray(key)?.let { arr -> (0 until arr.length()).map { arr.getString(it) } }
+            ?: emptyList()
 }

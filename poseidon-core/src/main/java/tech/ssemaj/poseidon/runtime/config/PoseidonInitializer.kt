@@ -17,13 +17,13 @@ class PoseidonInitializer : Initializer<Unit> {
         try {
             val config = PolicyAssetLoader.load(context)
             PolicyInstaller.install(config)
-            Log.i(
-                "Poseidon",
-                "policy loaded: mode=${config.mode}, " +
-                    "${config.allowedHosts.size} allowed host(s), " +
-                    "${config.deniedPaths.size} denied path(s), " +
-                    "${config.allowedCidrs.size} allowed CIDR(s)",
-            )
+            with(config) {
+                Log.i(
+                    "Poseidon",
+                    "policy loaded: mode=$mode, ${allowedHosts.size} allowed host(s), " +
+                        "${deniedPaths.size} denied path(s), ${allowedCidrs.size} allowed CIDR(s)",
+                )
+            }
         } catch (e: Exception) {
             Log.w("Poseidon", "no policy asset found; running open (${e.message})")
         }

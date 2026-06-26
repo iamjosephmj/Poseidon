@@ -51,8 +51,7 @@ object Observer {
     }
 
     private fun logSink(e: EgressEvent) {
-        val d = e.decision
-        val verdict = if (d?.block == true) "BLOCK (${d.reason})" else "ALLOW"
+        val verdict = e.decision?.takeIf { it.block }?.let { "BLOCK (${it.reason})" } ?: "ALLOW"
         Log.i("Poseidon", "[${Mode.current}/${e.tier}] ${e.host ?: e.ip}${e.path ?: ""} -> $verdict")
     }
 }

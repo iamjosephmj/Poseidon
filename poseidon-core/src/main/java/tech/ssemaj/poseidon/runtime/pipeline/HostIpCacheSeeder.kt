@@ -17,13 +17,13 @@ internal object HostIpCacheSeeder {
     private val seeded: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     fun seed(host: String) {
-        if (host.isNotEmpty() && seeded.add(host)) {
-            try {
-                val ips = InetAddress.getAllByName(host).mapNotNull { it.hostAddress }
-                if (ips.isNotEmpty()) NativeBridge.cacheHostIps(host, ips.toTypedArray())
-            } catch (_: Throwable) {
-            }
-        }
+        if (host.isEmpty() || !seeded.add(host)) return
+        try {
+            InetAddress.getAllByName(host)
+                .mapNotNull { it.hostAddress }
+                .takeIf { it.isNotEmpty() }
+                ?.let { NativeBridge.cacheHostIps(host, it.toTypedArray()) }
+        } catch (_: Throwable) {}
     }
 
     /**
