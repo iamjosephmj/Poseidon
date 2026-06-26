@@ -31,20 +31,14 @@ egress control and a per‑SDK audit for the realistic, non‑adversarial case.
 
 ## What it is
 
-Poseidon lets the **app author** declare, in the manifest, which hosts the app's SDKs may
-reach. At build time it compiles that policy and weaves enforcement into the app; at runtime
-it allows / blocks / audits every outbound connection across three layers:
+You list the hosts your app's SDKs are allowed to reach. Poseidon enforces that list and
+shows you where each SDK actually connects — covering ordinary HTTP libraries, native
+(C/C++) SDKs, and even Go/raw‑syscall code, all inside your app, with no VPN and no root.
 
-| Layer | Covers | How |
-|---|---|---|
-| **JVM bytecode** | OkHttp (incl. Retrofit / Ktor‑OkHttp), HttpURLConnection (incl. Volley HurlStack / Ktor‑Android), Volley, Cronet (Java API) | ASM transform at build time — host **and** path (path is only visible above TLS) |
-| **Native libc** *(opt‑in)* | Any native SDK that reaches the network through libc — Cronet, WebRTC, … | `libposeidon_shim.so` injected as the first `DT_NEEDED` of each `.so`; interposes `connect`/`sendto`/`getaddrinfo`… |
-| **seccomp** *(opt‑in)* | Go runtimes and raw `syscall()` that bypass libc entirely | A `SECCOMP_RET_USER_NOTIF` filter on the app's **own** process traps connects below libc |
+Run it in **monitor** mode to just watch and log where each SDK goes, or **enforce** mode to
+block anything that isn't on your list.
 
-Two modes, selectable per build: **`monitor`** (log what *would* happen — produces the
-per‑SDK egress map) and **`enforce`** (additionally block). Same pipeline.
-
-Deep architecture, diagrams, and the underlying techniques live in **[ARCH.md](ARCH.md)**.
+Curious how it works under the hood? It's all in **[ARCH.md](ARCH.md)** — diagrams included.
 
 ---
 
