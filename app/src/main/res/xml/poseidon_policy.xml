@@ -3,9 +3,10 @@
     <allow host="example.com"/>
     <deny-path pattern="/blocked/*"/>
     <!-- Opt-in CIDR allow-list: Cloudflare IP ranges covering example.com
-         (resolves to 104.20.x and 172.66.x). Closes the bare-IP raw-connect
-         residual for IPs outside these ranges. -->
+         (resolves to 104.20.x / 172.66.x over IPv4 and 2606:4700::/32 over IPv6).
+         Closes the bare-IP raw-connect residual for IPs outside these ranges. -->
     <allow-cidr value="104.16.0.0/13"/>
     <allow-cidr value="172.64.0.0/13"/>
     <allow-cidr value="162.158.0.0/15"/>
+    <allow-cidr value="2606:4700::/32"/>
 </poseidon>
