@@ -3,10 +3,11 @@ package tech.ssemaj.poseidon.runtime
 import android.os.Process
 
 /**
- * Thin JVM-tier producer: builds an EgressEvent, runs it through the one PolicyEngine,
- * records via the one Observer, and returns the ModeGate decision. The seccomp IP-cache
- * seed for allowed hosts (so the connect gate recognizes platform-resolved IPs) stays
- * here — it is a JVM-tier side effect, not a policy decision.
+ * Pattern: **Facade** — one JVM-tier entry point (`shouldBlock`) over the policy
+ * pipeline. Builds an [EgressEvent], runs it through the one [PolicyEngine], records via
+ * the one [Observer], and returns the [ModeGate] decision; the seccomp IP-cache seed for
+ * allowed hosts (via [HostIpCacheSeeder]) is a JVM-tier side effect, not a policy
+ * decision. Every HTTP-client adapter calls only this, so the subsystem stays hidden.
  */
 @InternalPoseidonApi
 object PoseidonGate {

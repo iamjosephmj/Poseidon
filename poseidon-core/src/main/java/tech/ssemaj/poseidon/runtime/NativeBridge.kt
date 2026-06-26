@@ -1,8 +1,9 @@
 package tech.ssemaj.poseidon.runtime
 
 /**
- * Internal seam — NOT a consumer API. Core-side bridge for the native backend:
- * poseidon-native registers a real [Backend]; the default is no-op so the core AAR is
+ * Pattern: **Bridge** (internal seam — NOT a consumer API) — decouples the abstraction
+ * (core's policy push) from its implementation: poseidon-native registers a real
+ * [Backend]; the default is no-op so the core AAR is
  * Play-policy clean without native code. (Not marked @InternalPoseidonApi because it is
  * implemented across the module boundary by poseidon-native's NativeShimBackend, which
  * would otherwise need an opt-in; the doc here states the intent.)

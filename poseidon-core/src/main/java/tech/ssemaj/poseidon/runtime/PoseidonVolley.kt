@@ -6,8 +6,9 @@ import com.android.volley.Request
 import java.net.URL
 
 /**
- * Volley adapter. The plugin injects PoseidonVolley.onAdd(request) at the top of
- * RequestQueue.add(Request); a denied request is cancelled before it dispatches.
+ * Pattern: **Adapter** — bridges Volley to the Poseidon gate. The plugin injects
+ * `PoseidonVolley.onAdd(request)` at the top of `RequestQueue.add(Request)`; a denied
+ * request is cancelled before it dispatches.
  */
 @InternalPoseidonApi
 object PoseidonVolley {

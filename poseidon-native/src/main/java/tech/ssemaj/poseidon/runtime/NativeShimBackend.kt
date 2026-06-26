@@ -3,7 +3,9 @@ package tech.ssemaj.poseidon.runtime
 import android.util.Log
 
 /**
- * Real [NativeBridge.Backend] backed by libposeidon_shim.so. Registers itself
+ * Pattern: **Adapter** — adapts the native `libposeidon_shim.so` (JNI) to the core's
+ * [NativeBridge.Backend] abstraction (the shim itself is a **Proxy** that interposes
+ * libc network calls). Real [NativeBridge.Backend] backed by libposeidon_shim.so. Registers itself
  * with [NativeBridge] on first use (triggered via reflective Class.forName from
  * [PoseidonInitializer] before policy is pushed, so the backend is ready).
  *

@@ -9,10 +9,11 @@ import java.net.URL
 import java.net.URLConnection
 
 /**
- * HttpURLConnection adapter. The plugin rewrites `URL.openConnection()/openStream()`
- * call sites to these statics (java.net.URL is a platform class, so call-site
- * rewriting is used instead of instrumenting the class). Covers raw
- * HttpURLConnection, Volley's HurlStack, and Ktor's Android engine.
+ * Pattern: **Adapter** + **Proxy** — adapts HttpURLConnection to the Poseidon gate and
+ * acts as a protection proxy over `URL.openConnection()/openStream()` (guard, then
+ * forward). The plugin rewrites those call sites to these statics (java.net.URL is a
+ * platform class, so call-site rewriting is used instead of instrumenting the class).
+ * Covers raw HttpURLConnection, Volley's HurlStack, and Ktor's Android engine.
  */
 @InternalPoseidonApi
 object PoseidonHttpUrl {

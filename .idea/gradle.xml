@@ -9,7 +9,11 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/poseidon-all" />
+            <option value="$PROJECT_DIR$/poseidon-core" />
+            <option value="$PROJECT_DIR$/poseidon-native" />
             <option value="$PROJECT_DIR$/poseidon-runtime" />
+            <option value="$PROJECT_DIR$/poseidon-seccomp" />
           </set>
         </option>
       </GradleProjectSettings>

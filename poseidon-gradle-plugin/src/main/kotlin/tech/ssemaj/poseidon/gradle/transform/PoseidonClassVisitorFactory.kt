@@ -8,6 +8,12 @@ import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 
+/**
+ * Pattern: **Visitor** (ASM) — walks every class/method at build time and rewrites the
+ * HTTP-client call sites declared in [NetworkAdapterRules] to route through Poseidon.
+ * ASM's ClassVisitor/MethodVisitor are the GoF Visitor applied to bytecode: this is the
+ * engine, [NetworkAdapterRules] is the visit registry.
+ */
 abstract class PoseidonClassVisitorFactory :
     AsmClassVisitorFactory<InstrumentationParameters.None> {
 

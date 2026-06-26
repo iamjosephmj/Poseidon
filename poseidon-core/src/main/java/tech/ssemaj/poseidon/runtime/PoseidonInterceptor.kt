@@ -7,7 +7,11 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 
-/** Path deny-list enforcement at OkHttp's plaintext layer (above TLS). */
+/**
+ * Pattern: **Decorator** (OkHttp `Interceptor`) — wraps the call chain at OkHttp's
+ * plaintext layer (above TLS), short-circuiting a denied request with a 403 and
+ * otherwise proceeding unchanged.
+ */
 @InternalPoseidonApi
 class PoseidonInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {

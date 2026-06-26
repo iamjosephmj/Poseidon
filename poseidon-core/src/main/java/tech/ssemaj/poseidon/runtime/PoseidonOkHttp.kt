@@ -5,8 +5,9 @@ package tech.ssemaj.poseidon.runtime
 import okhttp3.OkHttpClient
 
 /**
- * Called from `OkHttpClient.Builder.build()` by the bytecode the Gradle plugin injects.
- * Idempotent: newBuilder() copies our interceptor into the new builder.
+ * Pattern: **Adapter** — bridges OkHttp to the Poseidon gate by installing
+ * [PoseidonInterceptor]. Called from `OkHttpClient.Builder.build()` by the bytecode the
+ * Gradle plugin injects. Idempotent: newBuilder() copies our interceptor into the new builder.
  */
 @InternalPoseidonApi
 object PoseidonOkHttp {
