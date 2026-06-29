@@ -10,7 +10,7 @@
 
 [![CI](https://img.shields.io/github/actions/workflow/status/iamjosephmj/Poseidon/poseidon-ci.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&color=00d4ff)](https://github.com/iamjosephmj/Poseidon/actions/workflows/poseidon-ci.yml)
 [![JitPack](https://img.shields.io/jitpack/version/com.github.iamjosephmj/Poseidon?style=for-the-badge&logo=jitpack&logoColor=white&label=JitPack&color=0077b6)](https://jitpack.io/#iamjosephmj/Poseidon)
-[![License](https://img.shields.io/badge/License-MIT-0a2540?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-CC%20BY--ND%204.0-0a2540?style=for-the-badge)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-24%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](#)
 
 ### 🌊 [Why](#-why) • [What](#-what) • [How](#-how-to-use-it) • [Rules](#-the-rules-you-can-write) • [Demo](#-try-it) • [Deep dive](ARCH.md)
@@ -173,7 +173,7 @@ Contributing notes: **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## 📜 License
 
-[MIT](LICENSE) © [iamjosephmj](https://github.com/iamjosephmj)
+[CC BY-ND 4.0](LICENSE) © [iamjosephmj](https://github.com/iamjosephmj)
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:00d4ff,50:0077b6,100:0a2540&height=120&section=footer" width="100%"/>
 
