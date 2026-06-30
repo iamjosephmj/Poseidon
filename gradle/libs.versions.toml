@@ -12,6 +12,8 @@ poseidon = "0.1.2"
 cronet = "143.7445.0"
 volley = "1.2.1"
 okhttp = "4.12.0"
+mmkv = "2.4.0"
+grpc = "1.82.1"
 androidxStartup = "1.1.1"
 robolectric = "4.13"
 androidxTestCore = "1.6.1"
@@ -35,6 +37,9 @@ poseidon-all = { group = "com.github.iamjosephmj.Poseidon", name = "poseidon-all
 cronet-embedded = { group = "org.chromium.net", name = "cronet-embedded", version.ref = "cronet" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+mmkv = { group = "com.tencent", name = "mmkv", version.ref = "mmkv" }
+grpc-cronet = { group = "io.grpc", name = "grpc-cronet", version.ref = "grpc" }
+grpc-stub = { group = "io.grpc", name = "grpc-stub", version.ref = "grpc" }
 androidx-startup-runtime = { group = "androidx.startup", name = "startup-runtime", version.ref = "androidxStartup" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }

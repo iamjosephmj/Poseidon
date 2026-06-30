@@ -2,9 +2,11 @@ package tech.ssemaj.poseidon.probes
 
 import android.content.Context
 import tech.ssemaj.poseidon.probes.interposition.CronetProbe
+import tech.ssemaj.poseidon.probes.interposition.GrpcCronetProbe
 import tech.ssemaj.poseidon.probes.interposition.HttpUrlConnectionProbe
 import tech.ssemaj.poseidon.probes.interposition.OkHttpProbe
 import tech.ssemaj.poseidon.probes.interposition.VolleyProbe
+import tech.ssemaj.poseidon.probes.nativelib.MmkvProbe
 import tech.ssemaj.poseidon.probes.seccomp.RawDnsProbe
 import tech.ssemaj.poseidon.probes.seccomp.RawSyscallProbe
 
@@ -21,6 +23,12 @@ import tech.ssemaj.poseidon.probes.seccomp.RawSyscallProbe
  *
  * **Tier 2 — native libc shim** (ELF DT_NEEDED interposition):
  * covered by [CronetProbe] above (Cronet's native stack goes through libposeidon_shim.so).
+ * - [GrpcCronetProbe]          — gRPC over Cronet's native transport; egress to a
+ *                               non-allow-listed host is blocked by the native shim
+ *                               (no JVM adapter applies) -> Status UNAVAILABLE.
+ * - [MmkvProbe]                — third-party native lib (libmmkv.so) robustness:
+ *                               proves DT_NEEDED injection doesn't corrupt a dependency's
+ *                               .so, and is a zero-egress negative control (no sockets).
  *
  * **Tier 3 — seccomp Go-raw gate**:
  * - [RawSyscallProbe]  — raw connect() / sendto() syscalls (Go-runtime style)
@@ -45,5 +53,10 @@ object DemoProbes {
         HttpUrlConnectionProbe.run()
         VolleyProbe.run(context)
         CronetProbe.run(context)
+        // Native networking SDK (gRPC/Cronet): blocked by the native shim, not the JVM tier.
+        GrpcCronetProbe.run(context)
+
+        // Native-lib robustness (no egress): a third-party AAR .so rewritten by Poseidon.
+        MmkvProbe.run(context)
     }
 }

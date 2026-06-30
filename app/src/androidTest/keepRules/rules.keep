@@ -1,0 +1,7 @@
+# R8 keep rules for the instrumented-test (androidTest) APK.
+# AGP combines all keep rule files in src/androidTest/keepRules to pass to R8.
+
+# Native-lib SDKs (e.g. com.tencent:mmkv) carry errorprone annotations that
+# reference compile-only JDK classes absent at runtime. The test APK shrinks with
+# R8 too, so it needs the same suppression.
+-dontwarn javax.lang.model.element.Modifier
