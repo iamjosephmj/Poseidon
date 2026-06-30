@@ -1,7 +1,13 @@
 /* seccomp_supervisor.c — in-process seccomp USER_NOTIF supervisor for libposeidon_shim.
  *
- * The supervisor thread is created BEFORE the BPF filter is installed so it
- * stays UNFILTERED (its own syscalls never trap).  It handles trapped connect(),
+ * Coverage: the filter is installed with TSYNC + TSYNC_ESRCH (Linux 5.7+) so it
+ * applies to EVERY thread in the process — closing the gap where a raw connect on
+ * a thread outside the installer's lineage was ungated.  TSYNC also filters the
+ * supervisor itself, so when fully covered (g_full_coverage) the supervisor takes
+ * the CONTINUE-based allow path and skips its recvfrom emulation — it must not issue
+ * a trapped syscall of its own or it would self-trap and deadlock.  On kernels
+ * without TSYNC_ESRCH it falls back to NEW_LISTENER-only (installer-lineage coverage,
+ * supervisor unfiltered, TOCTOU-safe emulation).  It handles trapped connect(),
  * sendto(), recvfrom(), sendmsg(), and sendmmsg() from native/Go callers.
  *
  * Connect enforcement: STRICT raw default-deny — block anything not positively
@@ -31,8 +37,16 @@
 #define LOG(...) __android_log_print(ANDROID_LOG_INFO, "POSEIDON", __VA_ARGS__)
 
 /* ---- seccomp API fallback defines (pre-5.0 kernel headers) ---- */
+#ifndef SECCOMP_FILTER_FLAG_TSYNC
+#define SECCOMP_FILTER_FLAG_TSYNC         (1UL << 0)
+#endif
 #ifndef SECCOMP_FILTER_FLAG_NEW_LISTENER
 #define SECCOMP_FILTER_FLAG_NEW_LISTENER  (1UL << 3)
+#endif
+/* Linux 5.7+: makes TSYNC usable together with NEW_LISTENER (returns the listener
+ * fd on success; -ESRCH instead of a TID if a thread can't be synced). */
+#ifndef SECCOMP_FILTER_FLAG_TSYNC_ESRCH
+#define SECCOMP_FILTER_FLAG_TSYNC_ESRCH   (1UL << 4)
 #endif
 #ifndef SECCOMP_USER_NOTIF_FLAG_CONTINUE
 #define SECCOMP_USER_NOTIF_FLAG_CONTINUE  (1UL << 0)
@@ -59,6 +73,11 @@
 /* ---- Listener fd (published atomically after install) ---- */
 static int       g_notif_fd  = -1;
 static pthread_t g_supervisor;
+
+/* 1 when the filter was TSYNC'd to every thread (full coverage). In that mode the
+ * supervisor is ALSO filtered, so it must NOT issue trapped syscalls (connect /
+ * recvfrom) of its own — it CONTINUEs the allow path instead of emulating it. */
+static int       g_full_coverage = 0;
 
 /* ---- In-process DNS correlation (fd -> hostname map) ---- */
 #define DNSMAP_CAP 256
@@ -167,13 +186,22 @@ static void handle_connect_notif(int fd,
         resp->flags = 0;
         resp->error = -EACCES;
     } else if (v == P_ALLOW || v == P_NA) {
-        /* Emulate connect with the trusted copy (no CONTINUE — prevents
-         * TOCTOU swap of the user-space sockaddr after the check). */
-        int cfd = (int) req->data.args[0];
-        int r   = connect(cfd, (struct sockaddr *) &ss, alen);
-        resp->flags = 0;
-        resp->val   = (r == 0) ? 0 : -1;
-        resp->error = (r == 0) ? 0 : -errno;
+        if (g_full_coverage) {
+            /* Supervisor is itself filtered (TSYNC full coverage): it must NOT issue
+             * a connect() of its own — that would self-trap and deadlock. Let the
+             * kernel run the original connect in the target thread. (Loses the
+             * TOCTOU-swap hardening — an adversarial in-process caller could swap the
+             * sockaddr after the check; out of scope for the non-adversarial model.) */
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else {
+            /* Unfiltered supervisor: emulate connect with the trusted copy (no
+             * CONTINUE — prevents TOCTOU swap of the user-space sockaddr). */
+            int cfd = (int) req->data.args[0];
+            int r   = connect(cfd, (struct sockaddr *) &ss, alen);
+            resp->flags = 0;
+            resp->val   = (r == 0) ? 0 : -1;
+            resp->error = (r == 0) ? 0 : -errno;
+        }
     }
     /* else: P_MONITOR_VIOL (monitor mode — log only) → CONTINUE */
     (void) fd;
@@ -246,6 +274,11 @@ static void handle_sendmsg_notif(long nr,
 
 static void handle_recvfrom_notif(const struct seccomp_notif *req,
                                    struct seccomp_notif_resp  *resp) {
+    /* Under TSYNC full coverage the supervisor is filtered, so it cannot perform the
+     * recvfrom() itself (self-trap → deadlock). CONTINUE — the kernel delivers the DNS
+     * response to the caller; we forgo the raw-recvfrom IP->host correlation (the libc
+     * getaddrinfo hook, sendto:53 recording, and JVM seeding still correlate). */
+    if (g_full_coverage) return;
     int rfd   = (int) req->data.args[0];
     int flags = (int) req->data.args[3];
     char host[256];
@@ -358,15 +391,34 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_installSeccomp(
     struct sock_filter buf_conn[6], buf_dns[10];
     struct sock_fprog prog = build_bpf_program(dnsCorrelation, buf_conn, buf_dns);
 
+    /* Prefer FULL thread coverage: TSYNC syncs the filter to every thread (closing
+     * the gap where a raw connect on a thread outside the installer's lineage was
+     * ungated); TSYNC_ESRCH (5.7+) lets TSYNC combine with NEW_LISTENER. If the kernel
+     * lacks TSYNC_ESRCH (or a thread can't sync), fall back to NEW_LISTENER-only
+     * (installer-lineage coverage). TSYNC also filters the supervisor, so g_full_coverage
+     * flips it to the CONTINUE-based allow path (see handle_connect/recvfrom). */
+    errno = 0;
     long fd = syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER,
-                      SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
+                      SECCOMP_FILTER_FLAG_NEW_LISTENER
+                      | SECCOMP_FILTER_FLAG_TSYNC
+                      | SECCOMP_FILTER_FLAG_TSYNC_ESRCH, &prog);
+    int full = (fd >= 0);
+    if (fd < 0) {
+        LOG("seccomp gate: TSYNC install unavailable errno=%d (%s); falling back to per-lineage",
+            errno, strerror(errno));
+        errno = 0;
+        fd = syscall(__NR_seccomp, SECCOMP_SET_MODE_FILTER,
+                     SECCOMP_FILTER_FLAG_NEW_LISTENER, &prog);
+    }
     if (fd < 0) {
         LOG("seccomp gate: install failed errno=%d (%s)", errno, strerror(errno));
         return -1;
     }
+    g_full_coverage = full;
     __atomic_store_n(&g_notif_fd, (int) fd, __ATOMIC_RELEASE);
-    LOG("seccomp gate: ACTIVE on connect()%s (fd=%ld)",
-        dnsCorrelation ? " + sendto/recvfrom (DNS correlation)" : "", fd);
+    LOG("seccomp gate: ACTIVE on connect()%s — %s coverage (fd=%ld)",
+        dnsCorrelation ? " + sendto/recvfrom (DNS correlation)" : "",
+        full ? "FULL (all threads, TSYNC)" : "partial (installer lineage)", fd);
     return 0;
 #else
     LOG("seccomp gate: no direct connect syscall on this ABI, skipped");
