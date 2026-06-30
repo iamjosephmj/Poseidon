@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "tech.ssemaj.poseidon"
-version = "0.1.3"
+version = "0.1.4"
 
 // Target Java 17 bytecode so the published plugin loads on any Gradle JDK (17+), regardless
 // of the JDK used to build it. Both Java AND Kotlin targets must be pinned (the plugin code

@@ -13,7 +13,7 @@ import tech.ssemaj.poseidon.gradle.transform.PoseidonClassVisitorFactory
 // ---------------------------------------------------------------------------
 /** Runtime AAR version the plugin pulls in automatically (kept in lockstep with the
  *  plugin release) so consumers only apply the plugin — no separate `implementation(...)`. */
-private const val POSEIDON_RUNTIME_VERSION = "0.1.3"
+private const val POSEIDON_RUNTIME_VERSION = "0.1.4"
 private const val POSEIDON_GROUP = "com.github.iamjosephmj.Poseidon"
 
 // Task name prefixes — one task per variant is registered as "<prefix><Variant>".

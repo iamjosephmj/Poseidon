@@ -67,7 +67,7 @@ maven { url = uri("https://jitpack.io") }
 // app/build.gradle.kts
 plugins {
     id("com.android.application")
-    id("tech.ssemaj.poseidon") version "0.1.3"
+    id("tech.ssemaj.poseidon") version "0.1.4"
 }
 ```
 **That's it** — applying the plugin pulls in the Poseidon runtime automatically; no separate

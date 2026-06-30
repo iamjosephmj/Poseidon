@@ -9,7 +9,7 @@ plugins {
 // JitPack coordinates → com.github.iamjosephmj.Poseidon:<module>:<tag>
 allprojects {
     group = "com.github.iamjosephmj.Poseidon"
-    version = "0.1.3"
+    version = "0.1.4"
 }
 
 // Publish the poseidon-* Android library modules as AARs (consumed via JitPack).
