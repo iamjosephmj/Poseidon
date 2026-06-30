@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import tech.ssemaj.poseidon.control.UiState
+import tech.ssemaj.poseidon.runtime.model.EgressEvent
 import tech.ssemaj.poseidon.runtime.model.Tier
 import tech.ssemaj.poseidon.ui.components.EventRow
 import tech.ssemaj.poseidon.ui.theme.AquaAllow
@@ -40,7 +41,7 @@ fun TiersScreen(state: UiState) {
         TIER_META.forEach { meta ->
             val tally = state.tierTallies.firstOrNull { it.tier == meta.tier }
             val recent = state.events.filter { it.tier == meta.tier }.take(5)
-            TierCard(meta, tally?.allowed ?: 0, tally?.blocked ?: 0, recent, recentRow = { EventRow(it) })
+            TierCard(meta, tally?.allowed ?: 0, tally?.blocked ?: 0, recent)
         }
     }
 }
@@ -50,8 +51,7 @@ private fun TierCard(
     meta: TierMeta,
     allowed: Int,
     blocked: Int,
-    recent: List<tech.ssemaj.poseidon.runtime.model.EgressEvent>,
-    recentRow: @Composable (tech.ssemaj.poseidon.runtime.model.EgressEvent) -> Unit,
+    recent: List<EgressEvent>,
 ) {
     Surface(color = DeepBlue, shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,7 +64,7 @@ private fun TierCard(
             if (recent.isEmpty()) {
                 Text("no traffic yet", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
             } else {
-                recent.forEach { recentRow(it) }
+                recent.forEach { EventRow(it) }
             }
         }
     }

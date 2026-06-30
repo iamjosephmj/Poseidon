@@ -40,6 +40,7 @@ class PoseidonViewModel(app: Application) : AndroidViewModel(app) {
     fun policySnapshot(): PolicyInfo = policy
 
     override fun onCleared() {
+        super.onCleared()
         Observer.removeSink(sink)
     }
 
