@@ -69,6 +69,17 @@ dependencies {
     implementation(libs.volley)
     // OkHttp present so the plugin's bytecode transform has something to instrument.
     implementation(libs.okhttp)
+    // MMKV (Tencent) ships a third-party native lib (libmmkv.so) and makes NO network
+    // calls — used as a robustness probe that Poseidon's DT_NEEDED injection into a
+    // dependency-provided .so leaves it loadable and runnable (and emits zero egress).
+    implementation(libs.mmkv)
+    // gRPC over Cronet's NATIVE transport: a real networking SDK whose bytes leave the
+    // process through native code, so only Poseidon's native libc shim (not the JVM
+    // adapters) can block it. cronet-api is excluded because cronet-embedded provides it.
+    implementation(libs.grpc.cronet) {
+        exclude(group = "org.chromium.net", module = "cronet-api")
+    }
+    implementation(libs.grpc.stub)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
