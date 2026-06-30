@@ -27,6 +27,7 @@ import tech.ssemaj.poseidon.ui.theme.TextSecondary
 fun PlaygroundScreen(state: UiState, onToggleMode: () -> Unit, onRunAll: () -> Unit) {
     val ctx = LocalContext.current
     val verify = remember { VerifyState() }
+    DisposableEffect(Unit) { onDispose { verify.shutdown() } }
     var style by remember { mutableStateOf(ClientStyle.OKHTTP) }
 
     LazyColumn(
