@@ -16,9 +16,7 @@ import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
 import tech.ssemaj.poseidon.runtime.NativeShimBackend
-import tech.ssemaj.poseidon.runtime.internal.NativeBridge
 import java.net.HttpURLConnection
-import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URL
 import java.nio.ByteBuffer
@@ -151,32 +149,19 @@ class VerifyState(private val allowedHosts: List<String> = emptyList()) {
 
     private fun raw(url: String): Pair<String, Boolean> {
         val host = runCatching { URL(url).host }.getOrDefault(url).ifEmpty { url }
-        // The native rawConnect helper is IPv4-only (AF_INET / inet_pton(AF_INET)).
-        // Pick an IPv4 so we actually exercise the seccomp gate — handing it an IPv6
-        // string would inet_pton-fail to 0.0.0.0 and connect nowhere (false "allowed").
-        val all = runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
+        // rawConnect is IPv4/IPv6-aware; use the first resolved address. The native gate
+        // STRICT-default-denies anything it can't positively identify, so a non-allow-listed
+        // host is blocked (errno 13) regardless of correlation; an allow-listed host is
+        // permitted via the JVM gate's startup IP seeding.
+        val ip = runCatching { InetAddress.getByName(host).hostAddress }.getOrNull()
             ?: return "can't resolve $host" to false
-        // Seed DNS correlation so the native gate can decide by HOSTNAME. A raw connect()
-        // carries no name, and InetAddress uses the platform resolver (bypassing the libc
-        // getaddrinfo hook), so without this the IP is "un-identified" and — with no CIDR
-        // list — allowed by the gate's positive-identity fallback. Pushing host->IPs (the
-        // same bridge the JVM gate uses for allowed hosts) lets the gate block a denied
-        // host by name and allow an allow-listed one.
-        runCatching {
-            NativeBridge.cacheHostIps(host, all.mapNotNull { it.hostAddress }.toTypedArray())
-        }
-        val ip = all.filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
-            ?: return "no IPv4 for $host — raw probe is IPv4-only [${all.firstOrNull()?.hostAddress}]" to false
         // errno 13 = seccomp blocked; any other errno means the SYN was NOT blocked.
         return when (val errno = NativeShimBackend.rawConnectTest(ip, HTTPS_PORT)) {
             13   -> "errno=13 — seccomp blocked: default-deny [$ip]" to true
             0    -> if (hostAllowListed(host)) {
                 "errno=0 — allowed: host on allow-list [$ip]" to false
             } else {
-                // Succeeded for a host NOT on the allow-list: an IP/CIDR grant, OR the
-                // seccomp tier didn't gate this thread (raw-syscall coverage is partial —
-                // USER_NOTIF can't TSYNC to all threads). Either way a SYN reached the host.
-                "errno=0 — NOT blocked (SYN reached host); host NOT allow-listed — IP grant or un-gated raw thread [$ip]" to false
+                "errno=0 — NOT blocked (SYN reached host); host NOT allow-listed [$ip]" to false
             }
             111  -> "errno=111 — NOT blocked (SYN reached host); peer refused [$ip]" to false
             else -> "errno=$errno — NOT blocked (SYN attempted) [$ip]" to false

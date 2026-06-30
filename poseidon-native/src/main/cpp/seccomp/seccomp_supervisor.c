@@ -4,9 +4,9 @@
  * stays UNFILTERED (its own syscalls never trap).  It handles trapped connect(),
  * sendto(), recvfrom(), sendmsg(), and sendmmsg() from native/Go callers.
  *
- * Connect enforcement: positive-identity only when no CIDR list is configured
- * (cache-miss / unidentified IPs CONTINUE).  When a CIDR list IS configured,
- * unidentified IPs outside the declared ranges are default-denied.
+ * Connect enforcement: STRICT raw default-deny — block anything not positively
+ * allowed (an allow-listed host identified via DNS correlation, or an allow-CIDR).
+ * A raw connect() has no hostname, so an un-identifiable destination is denied.
  *
  * Exports:
  *   Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_seccompProbe
@@ -142,16 +142,17 @@ static void handle_connect_notif(int fd,
     memcpy(&ss, uaddr, alen);
 
     char desc[320];
-    int identified = 0, has_cidrs = 0;
     poseidon_verdict_t v = poseidon_check((const struct sockaddr *) &ss,
-                                          desc, sizeof desc,
-                                          &identified, &has_cidrs);
+                                          desc, sizeof desc, NULL, NULL);
 
-    /* Block when: explicitly denied AND (positively identified via DNS cache,
-     * OR a non-empty CIDR list is configured — making unidentified IPs
-     * default-deny outside declared ranges).
-     * No CIDRs → positive-identity only (avoids CDN over-block). */
-    int do_block = (v == P_BLOCK) && (identified || has_cidrs);
+    /* STRICT raw default-deny: block anything not positively allowed (an
+     * allow-listed host identified via DNS correlation, or an allow-CIDR).
+     * A raw connect() carries no hostname, so an un-identifiable destination
+     * cannot be proven safe — deny it.  Trade-off: a connect to an un-correlated
+     * IP of an ALLOWED host is also denied (CDN rotation / fresh IPv6 / hardcoded
+     * IP); seed the host's IPs (NativeBridge.cacheHostIps) or declare an allow-CIDR
+     * to keep it reachable. */
+    int do_block = (v == P_BLOCK);
 
     if (do_block || v == P_MONITOR_VIOL) {
         char shost[64];
@@ -174,7 +175,7 @@ static void handle_connect_notif(int fd,
         resp->val   = (r == 0) ? 0 : -1;
         resp->error = (r == 0) ? 0 : -errno;
     }
-    /* else: P_MONITOR_VIOL or unidentified P_BLOCK (no CIDRs) → CONTINUE */
+    /* else: P_MONITOR_VIOL (monitor mode — log only) → CONTINUE */
     (void) fd;
 }
 

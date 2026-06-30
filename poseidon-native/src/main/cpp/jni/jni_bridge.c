@@ -133,17 +133,31 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawConnect(
     JNIEnv *env, jobject thiz, jstring jip, jint port) {
     (void) thiz;
     const char *ip = (*env)->GetStringUTFChars(env, jip, NULL);
-    int s = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in a;
-    memset(&a, 0, sizeof a);
-    a.sin_family = AF_INET;
-    a.sin_port   = htons((uint16_t) port);
-    inet_pton(AF_INET, ip, &a.sin_addr);
+    int is6 = (strchr(ip, ':') != NULL);
+    struct sockaddr_storage ss;
+    memset(&ss, 0, sizeof ss);
+    int s;
+    socklen_t alen;
+    if (is6) {
+        s = socket(AF_INET6, SOCK_STREAM, 0);
+        struct sockaddr_in6 *a6 = (struct sockaddr_in6 *) &ss;
+        a6->sin6_family = AF_INET6;
+        a6->sin6_port   = htons((uint16_t) port);
+        inet_pton(AF_INET6, ip, &a6->sin6_addr);
+        alen = (socklen_t) sizeof(struct sockaddr_in6);
+    } else {
+        s = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in *a4 = (struct sockaddr_in *) &ss;
+        a4->sin_family = AF_INET;
+        a4->sin_port   = htons((uint16_t) port);
+        inet_pton(AF_INET, ip, &a4->sin_addr);
+        alen = (socklen_t) sizeof(struct sockaddr_in);
+    }
     errno = 0;
-    long r = syscall(__NR_connect, s, (struct sockaddr *) &a, (socklen_t) sizeof a);
+    long r = syscall(__NR_connect, s, (struct sockaddr *) &ss, alen);
     int e = (r < 0) ? errno : 0;
     (*env)->ReleaseStringUTFChars(env, jip, ip);
-    close(s);
+    if (s >= 0) close(s);
     return e;
 }
 
@@ -153,19 +167,32 @@ Java_tech_ssemaj_poseidon_runtime_NativeShimBackend_rawSendto(
     JNIEnv *env, jobject thiz, jstring jip, jint jport) {
     (void) thiz;
     const char *ip = (*env)->GetStringUTFChars(env, jip, NULL);
-    int s = socket(AF_INET, SOCK_DGRAM, 0);
-    struct sockaddr_in a;
-    memset(&a, 0, sizeof a);
-    a.sin_family = AF_INET;
-    a.sin_port   = htons((unsigned short) jport);
-    inet_pton(AF_INET, ip, &a.sin_addr);
+    int is6 = (strchr(ip, ':') != NULL);
+    struct sockaddr_storage ss;
+    memset(&ss, 0, sizeof ss);
+    int s;
+    socklen_t alen;
+    if (is6) {
+        s = socket(AF_INET6, SOCK_DGRAM, 0);
+        struct sockaddr_in6 *a6 = (struct sockaddr_in6 *) &ss;
+        a6->sin6_family = AF_INET6;
+        a6->sin6_port   = htons((unsigned short) jport);
+        inet_pton(AF_INET6, ip, &a6->sin6_addr);
+        alen = (socklen_t) sizeof(struct sockaddr_in6);
+    } else {
+        s = socket(AF_INET, SOCK_DGRAM, 0);
+        struct sockaddr_in *a4 = (struct sockaddr_in *) &ss;
+        a4->sin_family = AF_INET;
+        a4->sin_port   = htons((unsigned short) jport);
+        inet_pton(AF_INET, ip, &a4->sin_addr);
+        alen = (socklen_t) sizeof(struct sockaddr_in);
+    }
     const char *msg = "x";
     errno = 0;
-    long r = syscall(__NR_sendto, s, msg, 1, 0,
-                     (struct sockaddr *) &a, (socklen_t) sizeof a);
+    long r = syscall(__NR_sendto, s, msg, 1, 0, (struct sockaddr *) &ss, alen);
     int e = (r < 0) ? errno : 0;
     (*env)->ReleaseStringUTFChars(env, jip, ip);
-    close(s);
+    if (s >= 0) close(s);
     return e;
 }
 
