@@ -61,6 +61,8 @@ class VerifyState {
     private val pool = Executors.newCachedThreadPool()
     private var counter = 0L
 
+    fun shutdown() { pool.shutdown() }
+
     /** Fire the current [url] through [style] and record the outcome. */
     fun run(style: ClientStyle, context: Context) {
         val target = url.value.trim()
@@ -137,7 +139,11 @@ class VerifyState {
             }
         }
         engine.newUrlRequestBuilder(url, cb, exec).build().start()  // call-site rewritten; native shim gates the host
-        latch.await(AWAIT_SECONDS, TimeUnit.SECONDS)
+        try {
+            latch.await(AWAIT_SECONDS, TimeUnit.SECONDS)
+        } finally {
+            exec.shutdown()
+        }
         return outcome to blocked
     }
 
