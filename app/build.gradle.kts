@@ -67,10 +67,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // Poseidon: all-umbrella (core + native shim + seccomp). Temporarily consumed from the
-    // LOCAL module so library source changes (strict raw default-deny + IPv6 raw helpers)
-    // build into the demo. Switch back to libs.poseidon.all once a new release is published.
-    implementation(project(":poseidon-all"))
+    // Poseidon: all-umbrella (core + native shim + seccomp) — consumed from the published
+    // 0.1.3 release (includes strict raw default-deny + IPv6 raw helpers + TSYNC full
+    // thread coverage) to dogfood the real artifact rather than the local module.
+    implementation(libs.poseidon.all)
     implementation(libs.cronet.embedded)
     implementation(libs.volley)
     // OkHttp present so the plugin's bytecode transform has something to instrument.
