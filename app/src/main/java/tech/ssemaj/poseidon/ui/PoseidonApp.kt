@@ -151,7 +151,7 @@ fun PoseidonApp(vm: PoseidonViewModel) {
                             TiersScreen(state)
                         }
                         entry<Playground> {
-                            PlaygroundScreen(state, vm::toggleMode, vm::runAllProbes)
+                            PlaygroundScreen(state, policy, vm::toggleMode, vm::runAllProbes)
                         }
                         entry<Policy> {
                             PolicyScreen(policy)

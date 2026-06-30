@@ -52,7 +52,7 @@ private const val AWAIT_SECONDS = 10L
  * each Android client style. Queries run on a background pool; results are marshalled to the
  * main thread. Every query also flows into the live egress log via the audit Observer.
  */
-class VerifyState {
+class VerifyState(private val allowedHosts: List<String> = emptyList()) {
 
     val url = mutableStateOf("https://example.com/demo/path?x=1")
     val results = mutableStateListOf<QueryResult>()
@@ -152,9 +152,24 @@ class VerifyState {
         val ip = runCatching { InetAddress.getByName(host).hostAddress }.getOrNull()
             ?: return "can't resolve $host" to false
         return when (val errno = NativeShimBackend.rawConnectTest(ip, HTTPS_PORT)) {
-            13   -> "errno=13 — seccomp blocked ($ip)" to true
-            0    -> "errno=0 — allowed ($ip)" to false
-            else -> "errno=$errno ($ip)" to false
+            13   -> "errno=13 — seccomp blocked: default-deny [$ip]" to true
+            // A raw connect() carries no hostname — only an IP — so the native gate
+            // decides by IP. Label WHY it was allowed: an allow-listed host, or merely
+            // an IP-level grant (CIDR / shared CDN range) that the hostname never earned.
+            0    -> {
+                val why = if (hostAllowListed(host)) "host on allow-list"
+                          else "IP-level grant — host NOT allow-listed (CDN co-tenancy)"
+                "errno=0 — allowed: $why [$ip]" to false
+            }
+            111  -> "errno=111 — allowed (no listener) [$ip]" to false
+            else -> "errno=$errno [$ip]" to false
         }
+    }
+
+    /** Mirrors the allow-list host match (exact or `*.suffix`) purely to LABEL why a raw
+     *  connect was allowed. The native gate makes the real decision; this only annotates. */
+    private fun hostAllowListed(host: String): Boolean = allowedHosts.any { entry ->
+        if (entry.startsWith("*.")) host.endsWith(entry.substring(1), ignoreCase = true)
+        else host.equals(entry, ignoreCase = true)
     }
 }

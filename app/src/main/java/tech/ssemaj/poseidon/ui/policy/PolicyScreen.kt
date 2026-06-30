@@ -59,7 +59,7 @@ fun PolicyScreen(policy: PolicyInfo) {
         PolicyCard(
             title = "ALLOW-LIST · IP RANGES (CIDR)",
             accent = BioluminescentTeal,
-            blurb = "Bare-IP connections are permitted only inside these ranges.",
+            blurb = "Bare-IP connections are permitted only inside these ranges. Coarse IP grant — at the native/seccomp tier there is no hostname, so any host sharing these ranges (CDN co-tenancy) is permitted.",
         ) { ValueList(policy.allowedCidrs, BioluminescentTeal, emptyText = "none") }
 
         Surface(color = MarineBlue, shape = RoundedCornerShape(16.dp)) {
