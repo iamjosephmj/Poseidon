@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
@@ -47,7 +47,7 @@ private data object Overview : Dest {
 
 private data object Tiers : Dest {
     override val label = "Tiers"
-    override val icon = Icons.Default.List
+    override val icon = Icons.AutoMirrored.Filled.List
 }
 
 private data object Playground : Dest {
@@ -95,10 +95,13 @@ private class TopLevelBackStack<T : Any>(startKey: T) {
     }
 
     fun removeLast() {
-        val removedKey = topLevelStacks[topLevelKey]?.removeLastOrNull()
-        topLevelStacks.remove(removedKey)
-        if (topLevelStacks.isEmpty()) return
-        topLevelKey = topLevelStacks.keys.last()
+        val currentStack = topLevelStacks[topLevelKey] ?: return
+        currentStack.removeLastOrNull()
+        if (currentStack.isEmpty()) {
+            topLevelStacks.remove(topLevelKey)
+            if (topLevelStacks.isEmpty()) return
+            topLevelKey = topLevelStacks.keys.last()
+        }
         updateBackStack()
     }
 }
