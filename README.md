@@ -70,7 +70,7 @@ plugins {
     id("tech.ssemaj.poseidon") version "0.1.2"
 }
 dependencies {
-    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.2")
+    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.3")
 }
 ```
 
@@ -148,7 +148,7 @@ poseidon {
 ```
 
 > Want a **Play-clean, JVM-only** build with no binary changes? Depend on
-> `com.github.iamjosephmj.Poseidon:poseidon-core:0.1.2` instead of `poseidon-all`, or set
+> `com.github.iamjosephmj.Poseidon:poseidon-core:0.1.3` instead of `poseidon-all`, or set
 > `injectNative = false`.
 
 ## 🧪 Try it
