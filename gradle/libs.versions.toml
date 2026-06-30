@@ -36,6 +36,7 @@ androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "u
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 poseidon-all = { group = "com.github.iamjosephmj.Poseidon", name = "poseidon-all", version.ref = "poseidon" }
 cronet-embedded = { group = "org.chromium.net", name = "cronet-embedded", version.ref = "cronet" }
 volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
