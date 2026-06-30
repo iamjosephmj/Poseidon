@@ -26,7 +26,7 @@ class PoseidonController(
         val events = (listOf(event) + _state.value.events).take(maxEvents)
         _state.value = _state.value.copy(
             events = events,
-            allowedTotal = events.count { it.decision?.block != true },
+            allowedTotal = events.count { it.decision?.block != true }, // null decision = no block decision = pass-through, counts as allowed
             blockedTotal = events.count { it.decision?.block == true },
             tierTallies = tally(events),
         )
@@ -38,6 +38,7 @@ class PoseidonController(
         _state.value = _state.value.copy(mode = mode)
     }
 
+    @Synchronized
     fun toggleMode() =
         setMode(if (_state.value.mode == Mode.ENFORCE) Mode.MONITOR else Mode.ENFORCE)
 
