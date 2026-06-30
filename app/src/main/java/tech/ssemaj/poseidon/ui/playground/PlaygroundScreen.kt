@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import tech.ssemaj.poseidon.ClientStyle
+import tech.ssemaj.poseidon.PolicyInfo
 import tech.ssemaj.poseidon.VerifyState
 import tech.ssemaj.poseidon.control.UiState
 import tech.ssemaj.poseidon.runtime.model.Mode
@@ -24,9 +25,9 @@ import tech.ssemaj.poseidon.ui.theme.TextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaygroundScreen(state: UiState, onToggleMode: () -> Unit, onRunAll: () -> Unit) {
+fun PlaygroundScreen(state: UiState, policy: PolicyInfo, onToggleMode: () -> Unit, onRunAll: () -> Unit) {
     val ctx = LocalContext.current
-    val verify = remember { VerifyState() }
+    val verify = remember { VerifyState(policy.allowedHosts) }
     DisposableEffect(Unit) { onDispose { verify.shutdown() } }
     var style by remember { mutableStateOf(ClientStyle.OKHTTP) }
 
@@ -58,8 +59,8 @@ fun PlaygroundScreen(state: UiState, onToggleMode: () -> Unit, onRunAll: () -> U
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(
-                    onClick = { verify.url.value = "https://example.com/demo/path?x=1" },
-                    label = { Text("allowed: example.com") },
+                    onClick = { verify.url.value = "https://aparture.thessemaj.tech/demo/path?x=1" },
+                    label = { Text("allowed: aparture.thessemaj.tech") },
                 )
                 AssistChip(
                     onClick = { verify.url.value = "https://www.google.com/" },

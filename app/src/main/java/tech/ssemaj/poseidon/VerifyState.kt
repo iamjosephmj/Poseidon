@@ -52,9 +52,9 @@ private const val AWAIT_SECONDS = 10L
  * each Android client style. Queries run on a background pool; results are marshalled to the
  * main thread. Every query also flows into the live egress log via the audit Observer.
  */
-class VerifyState {
+class VerifyState(private val allowedHosts: List<String> = emptyList()) {
 
-    val url = mutableStateOf("https://example.com/demo/path?x=1")
+    val url = mutableStateOf("https://aparture.thessemaj.tech/demo/path?x=1")
     val results = mutableStateListOf<QueryResult>()
 
     private val main = Handler(Looper.getMainLooper())
@@ -149,12 +149,29 @@ class VerifyState {
 
     private fun raw(url: String): Pair<String, Boolean> {
         val host = runCatching { URL(url).host }.getOrDefault(url).ifEmpty { url }
+        // rawConnect is IPv4/IPv6-aware; use the first resolved address. The native gate
+        // STRICT-default-denies anything it can't positively identify, so a non-allow-listed
+        // host is blocked (errno 13) regardless of correlation; an allow-listed host is
+        // permitted via the JVM gate's startup IP seeding.
         val ip = runCatching { InetAddress.getByName(host).hostAddress }.getOrNull()
             ?: return "can't resolve $host" to false
+        // errno 13 = seccomp blocked; any other errno means the SYN was NOT blocked.
         return when (val errno = NativeShimBackend.rawConnectTest(ip, HTTPS_PORT)) {
-            13   -> "errno=13 — seccomp blocked ($ip)" to true
-            0    -> "errno=0 — allowed ($ip)" to false
-            else -> "errno=$errno ($ip)" to false
+            13   -> "errno=13 — seccomp blocked: default-deny [$ip]" to true
+            0    -> if (hostAllowListed(host)) {
+                "errno=0 — allowed: host on allow-list [$ip]" to false
+            } else {
+                "errno=0 — NOT blocked (SYN reached host); host NOT allow-listed [$ip]" to false
+            }
+            111  -> "errno=111 — NOT blocked (SYN reached host); peer refused [$ip]" to false
+            else -> "errno=$errno — NOT blocked (SYN attempted) [$ip]" to false
         }
+    }
+
+    /** Mirrors the allow-list host match (exact or `*.suffix`) purely to LABEL why a raw
+     *  connect was allowed. The native gate makes the real decision; this only annotates. */
+    private fun hostAllowListed(host: String): Boolean = allowedHosts.any { entry ->
+        if (entry.startsWith("*.")) host.endsWith(entry.substring(1), ignoreCase = true)
+        else host.equals(entry, ignoreCase = true)
     }
 }

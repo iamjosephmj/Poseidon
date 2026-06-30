@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <poseidon mode="enforce">
-    <allow host="example.com"/>
+    <allow host="aparture.thessemaj.tech"/>
     <deny-path pattern="/blocked/*"/>
-    <!-- Opt-in CIDR allow-list: Cloudflare IP ranges covering example.com
-         (resolves to 104.20.x / 172.66.x over IPv4 and 2606:4700::/32 over IPv6).
-         Closes the bare-IP raw-connect residual for IPs outside these ranges. -->
-    <allow-cidr value="104.16.0.0/13"/>
-    <allow-cidr value="172.64.0.0/13"/>
-    <allow-cidr value="162.158.0.0/15"/>
-    <allow-cidr value="2606:4700::/32"/>
+    <!-- Hostname-only allow-list: no opt-in CIDR ranges. The native/seccomp tiers
+         permit the allowed host via DNS correlation (its resolved IPs are seeded
+         into the native cache); bare-IP connects that can't be name-correlated to
+         an allowed host are denied. -->
 </poseidon>
