@@ -163,9 +163,3 @@ fun PoseidonApp(vm: PoseidonViewModel) {
     }
 }
 
-@Composable
-private fun PlaceholderScreen(text: String) {
-    Box(Modifier.fillMaxSize()) {
-        Text(text, modifier = Modifier.padding(24.dp))
-    }
-}
