@@ -134,7 +134,7 @@ Observer.addSink { e -> myMetrics.record(e.tier, e.host, e.decision?.block == tr
 | `<poseidon mode="monitor">` | **Watch only** — log where SDKs go, block nothing. |
 | `<allow host="example.com">` | Permit a host. Supports `*.wildcards`. *Adding any `allow` flips everything else to denied.* |
 | `<deny-path pattern="/internal/*">` | Block specific URL paths (HTTP libraries only — paths are hidden by TLS for native traffic). |
-| `<allow-cidr value="104.16.0.0/13">` | Permit an IP range — for native/Go code that connects by raw IP. |
+| `<allow-cidr value="104.16.0.0/13">` | Permit an IP range for native/Go code that connects by **bare IP** (no hostname to match on). The native/Go path is strict default-deny by destination, so use this when an allowed host's connections aren't name-correlated — e.g. rotating-CDN or hardcoded IPs. |
 
 With `:poseidon-all`, native (C/C++) and Go/raw-syscall coverage is **on by default** —
 nothing to configure. You can tune it if you want:

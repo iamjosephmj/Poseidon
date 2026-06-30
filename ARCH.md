@@ -182,7 +182,7 @@ flowchart TB
 | **libc shim** | any native SDK reaching the net through libc (Cronet, WebRTC, …) | ❌ (ciphertext) | ELF `DT_NEEDED` injection |
 | **seccomp** | Go runtimes & raw `syscall()` that bypass libc | ❌ | `SECCOMP_RET_USER_NOTIF` on our own process |
 
-### seccomp connect decision (positive-identity + opt-in CIDR)
+### seccomp connect decision (strict default-deny)
 
 ```mermaid
 flowchart TD
@@ -191,14 +191,15 @@ flowchart TD
   na -->|no| map["map IP → host via DNS-correlation cache"]
   map --> allowed{"host on allow-list<br/>OR IP in allowed CIDR?"}
   allowed -->|yes| cont2["CONTINUE / emulate (allow)"]
-  allowed -->|no| id{"IP positively identified<br/>OR a CIDR list is configured?"}
-  id -->|yes| block["resp.error = -EACCES (block)"]
-  id -->|no| cont3["CONTINUE (avoid CDN over-block)"]
+  allowed -->|no| block["resp.error = -EACCES (block)"]
 ```
 
-Without a CIDR list, an *un‑correlated bare‑IP* connect passes (positive‑identity only, so
-rotating CDNs aren't over‑blocked). Declaring `<allow-cidr>` flips the unknown‑IP default
-back to **deny**, closing that residual for IPs outside the declared ranges.
+**Strict default-deny:** anything not positively allowed — an allow-listed host identified
+via DNS correlation, or an IP inside an `<allow-cidr>` range — is blocked. A raw connect
+carries no hostname, so an un-identifiable destination can't be proven safe. Trade-off: an
+allow-listed host's *un-correlated* connect (rotating CDN, fresh IPv6, hardcoded IP) is also
+denied — the JVM gate seeds allowed hosts' IPs at startup, and `<allow-cidr>` covers bare-IP
+ranges, to keep them reachable. (`rawConnect`/`rawSendto` handle both IPv4 and IPv6.)
 
 ---
 
@@ -240,15 +241,20 @@ and drained off‑thread by a JVM daemon (~250 ms), which symbolizes the origin 
    `newUrlRequestBuilder`. Adapter rules are a one-file registry (`NetworkAdapterRules`).
 3. **seccomp `USER_NOTIF` (runtime).** The app installs a `SECCOMP_RET_USER_NOTIF` filter on
    *its own* process trapping `connect`/`sendto`/`recvfrom` **below libc** — the only
-   in-process way to cover Go runtimes and raw `syscall()`. A supervisor thread (kept
-   unfiltered) reads the sockaddr and decides. Legitimate kernel primitive, no other-process
-   tampering, no VPN consent.
+   in-process way to cover Go runtimes and raw `syscall()`. It's installed with
+   `TSYNC | TSYNC_ESRCH` (Linux ≥ 5.7) so it covers **every thread**, not just the
+   installer's lineage; older kernels fall back to `NEW_LISTENER`-only. A supervisor thread
+   reads the trusted sockaddr copy and decides — under full coverage it is *itself* filtered,
+   so it takes a `CONTINUE`-based allow path (issuing no syscall of its own) to avoid
+   self-trapping and deadlock. Legitimate kernel primitive, no other-process tampering, no
+   VPN consent.
 4. **In-process DNS correlation.** `getaddrinfo`/`gethostbyname` hooks and seccomp-trapped
    `sendto/recvfrom :53` build an IP→hostname cache, so a later connect to a bare IP can be
    mapped back to the host the policy is written in.
-5. **Opt-in CIDR allow-list.** `<allow-cidr>` ranges (v4/v6, masked-prefix match) let the
-   operator restore IP-layer default-deny without the rotating-CDN over-block — closing the
-   un-correlated bare-IP residual for addresses outside the declared ranges.
+5. **Opt-in CIDR allow-list.** The native/Go path is strict default-deny, so `<allow-cidr>`
+   ranges (v4/v6, masked-prefix match) are how you re-admit traffic that connects by **bare
+   IP** with no hostname to correlate — e.g. an allow-listed host on a rotating CDN — without
+   re-listing every address. CIDR allow is host-agnostic *within* a range.
 6. **Lock-free MPSC event ring.** Native egress events are published (CAS-reserve +
    per-slot release/acquire seq, drop-on-full) into a fixed ring and drained by the JVM —
    keeping the connect hot path log/lock/alloc-free.
@@ -269,7 +275,7 @@ and drained off‑thread by a JVM daemon (~250 ms), which symbolizes the origin 
 | HttpURLConnection / Volley / Ktor-Android | ✅ JVM | ✅ | ✅ |
 | Cronet (Java API) | ✅ native + ✅ JVM observe | ✅ at Java API | ✅ |
 | Native libc SDK (WebRTC…) | ✅ libc shim | ❌ (ciphertext) | ✅ |
-| Go / raw `syscall()` | ✅ seccomp (DNS-correlated / CIDR) | ❌ | ✅ |
+| Go / raw `syscall()` | ✅ seccomp — strict default-deny, all threads (TSYNC, kernel ≥ 5.7) | ❌ | ✅ |
 
 ## Honest limits
 
@@ -280,12 +286,15 @@ and drained off‑thread by a JVM daemon (~250 ms), which symbolizes the origin 
   kernel/MDM/network is). io_uring is denied and connect is TOCTOU-safe, but the class
   remains.
 - **Kernels < 5.0** — no seccomp `USER_NOTIF`; Go/raw is ungated there (libc + DNS still
-  enforce for libc code).
+  enforce for libc code). **Kernels 5.0–5.6** lack `TSYNC_ESRCH`, so the gate falls back to
+  installer-lineage coverage — a raw connect on an unrelated thread can slip; ≥ 5.7 gets full
+  all-thread coverage.
 - **DoH / DoT** — hides the name from correlation; the connect to the resolved IP is still
   gated. ECH will hide SNI.
-- **Un-correlated bare-IP raw/Go connect** — passes unless an `<allow-cidr>` list is
-  declared (then anything outside the ranges is blocked); CIDR allow is host-agnostic
-  *within* a range.
+- **Strict native/Go default-deny can over-block** an *allow-listed* host's connections that
+  aren't name-correlated (rotating CDN, fresh IPv6, hardcoded IP). Mitigated by the JVM
+  gate's startup IP seeding and `<allow-cidr>` ranges — the trade-off for closing the
+  un-correlated bare-IP residual (a non-allow-listed bare IP is now denied, not passed).
 
 Positioning: **strong default-deny egress control + per-SDK audit for non-adversarial
 SDKs** — not a guarantee against a hostile SDK or exfil via permitted destinations.
