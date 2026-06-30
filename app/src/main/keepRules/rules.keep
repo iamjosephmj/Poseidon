@@ -10,3 +10,13 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# The debug app is minified, so its APK is also the classpath the instrumented
+# (androidTest) APK resolves the Kotlin stdlib from. Keep the stdlib so the test
+# runner can load classes like kotlin.LazyKt at instrumentation startup.
+-keep class kotlin.** { *; }
+-dontwarn kotlin.**
+
+# Native-lib SDKs (e.g. com.tencent:mmkv) carry errorprone annotations that
+# reference compile-only JDK classes absent at runtime — benign under R8.
+-dontwarn javax.lang.model.element.Modifier
