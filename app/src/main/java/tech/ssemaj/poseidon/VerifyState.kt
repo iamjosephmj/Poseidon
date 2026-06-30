@@ -16,6 +16,7 @@ import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
 import tech.ssemaj.poseidon.runtime.NativeShimBackend
+import tech.ssemaj.poseidon.runtime.internal.NativeBridge
 import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -155,11 +156,18 @@ class VerifyState(private val allowedHosts: List<String> = emptyList()) {
         // string would inet_pton-fail to 0.0.0.0 and connect nowhere (false "allowed").
         val all = runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
             ?: return "can't resolve $host" to false
+        // Seed DNS correlation so the native gate can decide by HOSTNAME. A raw connect()
+        // carries no name, and InetAddress uses the platform resolver (bypassing the libc
+        // getaddrinfo hook), so without this the IP is "un-identified" and — with no CIDR
+        // list — allowed by the gate's positive-identity fallback. Pushing host->IPs (the
+        // same bridge the JVM gate uses for allowed hosts) lets the gate block a denied
+        // host by name and allow an allow-listed one.
+        runCatching {
+            NativeBridge.cacheHostIps(host, all.mapNotNull { it.hostAddress }.toTypedArray())
+        }
         val ip = all.filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
             ?: return "no IPv4 for $host — raw probe is IPv4-only [${all.firstOrNull()?.hostAddress}]" to false
-        // A raw connect() carries no hostname — only an IP — so the native gate decides
-        // by IP. errno 13 = seccomp blocked; any other errno means the SYN was NOT
-        // blocked (it reached the network).
+        // errno 13 = seccomp blocked; any other errno means the SYN was NOT blocked.
         return when (val errno = NativeShimBackend.rawConnectTest(ip, HTTPS_PORT)) {
             13   -> "errno=13 — seccomp blocked: default-deny [$ip]" to true
             0    -> if (hostAllowListed(host)) {
