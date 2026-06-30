@@ -32,6 +32,7 @@ import tech.ssemaj.poseidon.control.PoseidonViewModel
 import tech.ssemaj.poseidon.ui.components.WaveBackground
 import tech.ssemaj.poseidon.ui.overview.OverviewScreen
 import tech.ssemaj.poseidon.ui.policy.PolicyScreen
+import tech.ssemaj.poseidon.ui.playground.PlaygroundScreen
 import tech.ssemaj.poseidon.ui.tiers.TiersScreen
 
 // ─── Destination keys ────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ fun PoseidonApp(vm: PoseidonViewModel) {
                             TiersScreen(state)
                         }
                         entry<Playground> {
-                            PlaceholderScreen("Playground — Phase 2")
+                            PlaygroundScreen(state, vm::toggleMode, vm::runAllProbes)
                         }
                         entry<Policy> {
                             PolicyScreen(policy)
