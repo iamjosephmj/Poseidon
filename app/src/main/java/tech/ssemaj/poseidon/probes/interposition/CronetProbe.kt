@@ -17,7 +17,7 @@ import java.util.concurrent.Executors
  * shim into libcronet, the native [connect] call is observed / blocked under the
  * POSEIDON tag (controlled by `setprop debug.poseidon.block`).
  *
- * allow-list: example.com -> native allows; www.google.com is not listed -> native blocks.
+ * allow-list: aparture.thessemaj.tech -> native allows; www.google.com is not listed -> native blocks.
  */
 object CronetProbe {
     private const val TAG = "PoseidonDemo"
@@ -29,7 +29,7 @@ object CronetProbe {
      * Allow-listed root URL exercised via Cronet's native stack — expect HTTP 200 success.
      * Distinct from [DemoUrls.ALLOWED] which targets a sub-path; Cronet probes the root.
      */
-    private const val CRONET_ALLOWED_URL = "https://example.com/"
+    private const val CRONET_ALLOWED_URL = "https://aparture.thessemaj.tech/"
 
     fun run(ctx: Context) {
         val engine = CronetEngine.Builder(ctx).build()
@@ -52,7 +52,7 @@ object CronetProbe {
             }
         }
 
-        // example.com is in the allow-list -> native allows; google is not -> native blocks.
+        // aparture.thessemaj.tech is in the allow-list -> native allows; google is not -> native blocks.
         for (url in listOf(CRONET_ALLOWED_URL, DemoUrls.DENIED_HOST)) {
             engine.newUrlRequestBuilder(url, cb(url), exec).build().start()
         }

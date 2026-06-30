@@ -54,7 +54,7 @@ private const val AWAIT_SECONDS = 10L
  */
 class VerifyState(private val allowedHosts: List<String> = emptyList()) {
 
-    val url = mutableStateOf("https://example.com/demo/path?x=1")
+    val url = mutableStateOf("https://aparture.thessemaj.tech/demo/path?x=1")
     val results = mutableStateListOf<QueryResult>()
 
     private val main = Handler(Looper.getMainLooper())

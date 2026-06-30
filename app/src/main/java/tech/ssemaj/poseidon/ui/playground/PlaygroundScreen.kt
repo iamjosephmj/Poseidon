@@ -59,8 +59,8 @@ fun PlaygroundScreen(state: UiState, policy: PolicyInfo, onToggleMode: () -> Uni
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(
-                    onClick = { verify.url.value = "https://example.com/demo/path?x=1" },
-                    label = { Text("allowed: example.com") },
+                    onClick = { verify.url.value = "https://aparture.thessemaj.tech/demo/path?x=1" },
+                    label = { Text("allowed: aparture.thessemaj.tech") },
                 )
                 AssistChip(
                     onClick = { verify.url.value = "https://www.google.com/" },

@@ -8,7 +8,7 @@ package tech.ssemaj.poseidon.probes
  * - [DENIED_HOST]  — host NOT in the allow-list; Poseidon returns HTTP 403 before egress.
  */
 object DemoUrls {
-    const val ALLOWED      = "https://example.com/demo/path?x=1"
-    const val DENIED_PATH  = "https://example.com/blocked/secret"
+    const val ALLOWED      = "https://aparture.thessemaj.tech/demo/path?x=1"
+    const val DENIED_PATH  = "https://aparture.thessemaj.tech/blocked/secret"
     const val DENIED_HOST  = "https://www.google.com/"
 }
