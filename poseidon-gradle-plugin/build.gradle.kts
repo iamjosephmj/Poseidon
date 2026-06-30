@@ -5,7 +5,21 @@ plugins {
 }
 
 group = "tech.ssemaj.poseidon"
-version = "0.1.2"
+version = "0.1.3"
+
+// Target Java 17 bytecode so the published plugin loads on any Gradle JDK (17+), regardless
+// of the JDK used to build it. Both Java AND Kotlin targets must be pinned (the plugin code
+// is Kotlin), else compiling under a newer JDK emits class files that older Gradle JVMs
+// (which run the consuming build) can't load.
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
 
 dependencies {
     // AGP Instrumentation API (provided by the consuming build at runtime).

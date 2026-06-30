@@ -11,6 +11,11 @@ import tech.ssemaj.poseidon.gradle.policy.GeneratePolicyTask
 import tech.ssemaj.poseidon.gradle.transform.PoseidonClassVisitorFactory
 
 // ---------------------------------------------------------------------------
+/** Runtime AAR version the plugin pulls in automatically (kept in lockstep with the
+ *  plugin release) so consumers only apply the plugin — no separate `implementation(...)`. */
+private const val POSEIDON_RUNTIME_VERSION = "0.1.3"
+private const val POSEIDON_GROUP = "com.github.iamjosephmj.Poseidon"
+
 // Task name prefixes — one task per variant is registered as "<prefix><Variant>".
 // ---------------------------------------------------------------------------
 /** Prefix for the per-variant policy-generation task (e.g. generatePoseidonPolicyDebug). */
@@ -48,6 +53,18 @@ private const val AGP_STRIPPED_LIBS_PATH = "intermediates/stripped_native_libs/"
 class PoseidonPlugin : Plugin<Project> {
     override fun apply(project: Project) {
         val ext = project.extensions.create("poseidon", PoseidonExtension::class.java)
+
+        // Pull the Poseidon runtime in automatically so a consumer only applies the plugin —
+        // no separate `implementation("...poseidon-all")` line. injectNative picks the native
+        // umbrella vs the Play-clean JVM-only core. Deferred to afterEvaluate so the
+        // consumer's `poseidon { }` block has been configured.
+        project.afterEvaluate {
+            val artifact = if (ext.injectNative) "poseidon-all" else "poseidon-core"
+            project.dependencies.add(
+                "implementation",
+                "$POSEIDON_GROUP:$artifact:$POSEIDON_RUNTIME_VERSION",
+            )
+        }
 
         val components = project.extensions.findByType(AndroidComponentsExtension::class.java)
             ?: error("Poseidon must be applied after an Android application/library plugin")

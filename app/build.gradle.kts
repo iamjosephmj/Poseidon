@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("tech.ssemaj.poseidon") version "0.1.2"
+    id("tech.ssemaj.poseidon") version "0.1.3"
 }
 
 android {
@@ -67,10 +67,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    // Poseidon: all-umbrella (core + native shim + seccomp) — consumed from the published
-    // 0.1.3 release (includes strict raw default-deny + IPv6 raw helpers + TSYNC full
-    // thread coverage) to dogfood the real artifact rather than the local module.
-    implementation(libs.poseidon.all)
+    // Poseidon runtime (poseidon-all) is added automatically by the applied plugin —
+    // no explicit dependency needed here. See `plugins { id("tech.ssemaj.poseidon") }` above.
     implementation(libs.cronet.embedded)
     implementation(libs.volley)
     // OkHttp present so the plugin's bytecode transform has something to instrument.

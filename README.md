@@ -67,12 +67,12 @@ maven { url = uri("https://jitpack.io") }
 // app/build.gradle.kts
 plugins {
     id("com.android.application")
-    id("tech.ssemaj.poseidon") version "0.1.2"
-}
-dependencies {
-    implementation("com.github.iamjosephmj.Poseidon:poseidon-all:0.1.3")
+    id("tech.ssemaj.poseidon") version "0.1.3"
 }
 ```
+**That's it** — applying the plugin pulls in the Poseidon runtime automatically; no separate
+`implementation(...)` line. (Set `poseidon { injectNative = false }` for a Play-clean,
+JVM-only runtime instead.)
 
 ### 2. Declare your rules — in the manifest
 
@@ -147,9 +147,9 @@ poseidon {
 }
 ```
 
-> Want a **Play-clean, JVM-only** build with no binary changes? Depend on
-> `com.github.iamjosephmj.Poseidon:poseidon-core:0.1.3` instead of `poseidon-all`, or set
-> `injectNative = false`.
+> Want a **Play-clean, JVM-only** build with no binary changes? Set `injectNative = false`
+> in the `poseidon { }` block — the plugin then pulls the JVM-only `poseidon-core` runtime
+> instead of the native umbrella.
 
 ## 🧪 Try it
 
