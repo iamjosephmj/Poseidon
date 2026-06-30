@@ -17,6 +17,7 @@ import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
 import tech.ssemaj.poseidon.runtime.NativeShimBackend
 import java.net.HttpURLConnection
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URL
 import java.nio.ByteBuffer
@@ -149,20 +150,28 @@ class VerifyState(private val allowedHosts: List<String> = emptyList()) {
 
     private fun raw(url: String): Pair<String, Boolean> {
         val host = runCatching { URL(url).host }.getOrDefault(url).ifEmpty { url }
-        val ip = runCatching { InetAddress.getByName(host).hostAddress }.getOrNull()
+        // The native rawConnect helper is IPv4-only (AF_INET / inet_pton(AF_INET)).
+        // Pick an IPv4 so we actually exercise the seccomp gate — handing it an IPv6
+        // string would inet_pton-fail to 0.0.0.0 and connect nowhere (false "allowed").
+        val all = runCatching { InetAddress.getAllByName(host).toList() }.getOrNull()
             ?: return "can't resolve $host" to false
+        val ip = all.filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
+            ?: return "no IPv4 for $host — raw probe is IPv4-only [${all.firstOrNull()?.hostAddress}]" to false
+        // A raw connect() carries no hostname — only an IP — so the native gate decides
+        // by IP. errno 13 = seccomp blocked; any other errno means the SYN was NOT
+        // blocked (it reached the network).
         return when (val errno = NativeShimBackend.rawConnectTest(ip, HTTPS_PORT)) {
             13   -> "errno=13 — seccomp blocked: default-deny [$ip]" to true
-            // A raw connect() carries no hostname — only an IP — so the native gate
-            // decides by IP. Label WHY it was allowed: an allow-listed host, or merely
-            // an IP-level grant (CIDR / shared CDN range) that the hostname never earned.
-            0    -> {
-                val why = if (hostAllowListed(host)) "host on allow-list"
-                          else "IP-level grant — host NOT allow-listed (CDN co-tenancy)"
-                "errno=0 — allowed: $why [$ip]" to false
+            0    -> if (hostAllowListed(host)) {
+                "errno=0 — allowed: host on allow-list [$ip]" to false
+            } else {
+                // Succeeded for a host NOT on the allow-list: an IP/CIDR grant, OR the
+                // seccomp tier didn't gate this thread (raw-syscall coverage is partial —
+                // USER_NOTIF can't TSYNC to all threads). Either way a SYN reached the host.
+                "errno=0 — NOT blocked (SYN reached host); host NOT allow-listed — IP grant or un-gated raw thread [$ip]" to false
             }
-            111  -> "errno=111 — allowed (no listener) [$ip]" to false
-            else -> "errno=$errno [$ip]" to false
+            111  -> "errno=111 — NOT blocked (SYN reached host); peer refused [$ip]" to false
+            else -> "errno=$errno — NOT blocked (SYN attempted) [$ip]" to false
         }
     }
 
